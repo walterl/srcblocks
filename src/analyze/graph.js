@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { createProgram } from '#srcblocks/analyze/program.js';
+import { withProgram } from '#srcblocks/analyze/program.js';
 import { collectDeclarations, moduleId } from '#srcblocks/analyze/collect.js';
 import { resolveCalls } from '#srcblocks/analyze/calls.js';
 import { attachReferences } from '#srcblocks/analyze/references.js';
@@ -16,7 +16,10 @@ import { attachCarries, attachMembers, flowStats, resolveAccesses } from '#srcbl
  * function reads or writes of the data another file declares.
  */
 export function buildCallGraph({ rootDir, include = null }) {
-    const { program, checker, sourceFiles } = createProgram(rootDir);
+    return withProgram(rootDir, analysis => graphOf(analysis, rootDir, include));
+}
+
+function graphOf({ program, checker, sourceFiles }, rootDir, include) {
     const selected = include ? sourceFiles.filter(file => isIncluded(file.fileName, rootDir, include)) : sourceFiles;
 
     const collected = collectDeclarations(selected, rootDir);

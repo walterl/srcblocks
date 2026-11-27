@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import path from 'node:path';
-import ts from 'typescript';
+import * as ast from 'typescript/unstable/ast';
 
 export const fileId = relPath => `file:${relPath}`;
 export const moduleId = relDir => `module:${relDir}`;
@@ -31,7 +31,7 @@ const lineOf = (sourceFile, pos) => sourceFile.getLineAndCharacterOfPosition(pos
  */
 function leadingDoc(node, sourceFile) {
     const fullText = sourceFile.getFullText();
-    const ranges = ts.getLeadingCommentRanges(fullText, node.getFullStart()) || [];
+    const ranges = ast.getLeadingCommentRanges(fullText, node.getFullStart()) || [];
     const docs = ranges.filter(range => fullText.slice(range.pos, range.pos + 3).match(/^\/\*[*!]?|^\/\//));
     if (docs.length === 0) {
         return null;
@@ -48,16 +48,16 @@ const HOOK_CALLS = new Set(['before', 'beforeAll', 'beforeEach', 'after', 'after
 
 /* `describe`, `describe.only`, `describe.each([...])` all name `describe`. */
 function calledName(expression) {
-    if (ts.isIdentifier(expression)) {
+    if (ast.isIdentifier(expression)) {
         return expression.text;
     }
-    if (ts.isPropertyAccessExpression(expression)) {
+    if (ast.isPropertyAccessExpression(expression)) {
         return calledName(expression.expression);
     }
-    if (ts.isCallExpression(expression)) {
+    if (ast.isCallExpression(expression)) {
         return calledName(expression.expression);
     }
-    if (ts.isTaggedTemplateExpression(expression)) {
+    if (ast.isTaggedTemplateExpression(expression)) {
         return calledName(expression.tag);
     }
     return null;
@@ -68,7 +68,7 @@ const labelOf = call => {
     if (!first) {
         return null;
     }
-    if (ts.isStringLiteralLike(first)) {
+    if (ast.isStringLiteralLikeNode(first)) {
         return first.text;
     }
     return null;
@@ -77,15 +77,15 @@ const labelOf = call => {
 const callbackOf = call => [...(call.arguments || [])].reverse().find(argument => isFunctionLike(argument)) || null;
 
 const isFunctionLike = node =>
-    node && (ts.isArrowFunction(node) || ts.isFunctionExpression(node) || ts.isFunctionDeclaration(node));
+    node && (ast.isArrowFunction(node) || ast.isFunctionExpression(node) || ast.isFunctionDeclaration(node));
 
 const modifierFlags = node => {
-    const modifiers = ts.canHaveModifiers(node) ? ts.getModifiers(node) || [] : [];
+    const modifiers = node.modifiers || [];
     const kinds = new Set(modifiers.map(modifier => modifier.kind));
     return {
-        exported: kinds.has(ts.SyntaxKind.ExportKeyword),
-        isStatic: kinds.has(ts.SyntaxKind.StaticKeyword),
-        isAsync: kinds.has(ts.SyntaxKind.AsyncKeyword),
+        exported: kinds.has(ast.SyntaxKind.ExportKeyword),
+        isStatic: kinds.has(ast.SyntaxKind.StaticKeyword),
+        isAsync: kinds.has(ast.SyntaxKind.AsyncKeyword),
     };
 };
 
@@ -110,13 +110,13 @@ function describeValue(initializer, sourceFile) {
         return { shape: 'scalar', keys: null };
     }
 
-    if (ts.isObjectLiteralExpression(initializer)) {
+    if (ast.isObjectLiteralExpression(initializer)) {
         return { shape: 'composite', keys: initializer.properties.map(propertyName).filter(Boolean) };
     }
-    if (ts.isArrayLiteralExpression(initializer)) {
+    if (ast.isArrayLiteralExpression(initializer)) {
         return { shape: 'composite', keys: null };
     }
-    if (ts.isNewExpression(initializer)) {
+    if (ast.isNewExpression(initializer)) {
         return { shape: 'composite', keys: entryKeys(initializer, sourceFile) };
     }
     return { shape: 'scalar', keys: null };
@@ -127,7 +127,7 @@ const propertyName = property => {
     if (!name) {
         return null;
     }
-    if (ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name)) {
+    if (ast.isIdentifier(name) || ast.isStringLiteral(name) || ast.isNumericLiteral(name)) {
         return name.text;
     }
     return name.getText();
@@ -136,12 +136,12 @@ const propertyName = property => {
 /* The keys of `new Map([['a', 1], ...])` and the members of `new Set([...])`. */
 function entryKeys(expression, sourceFile) {
     const [argument] = expression.arguments || [];
-    if (!argument || !ts.isArrayLiteralExpression(argument)) {
+    if (!argument || !ast.isArrayLiteralExpression(argument)) {
         return null;
     }
 
     const keys = argument.elements.map(element => {
-        if (ts.isArrayLiteralExpression(element)) {
+        if (ast.isArrayLiteralExpression(element)) {
             return element.elements[0]?.getText(sourceFile) ?? null;
         }
         return element.getText(sourceFile);
@@ -150,16 +150,16 @@ function entryKeys(expression, sourceFile) {
 }
 
 const memberName = member => {
-    if (ts.isConstructorDeclaration(member)) {
+    if (ast.isConstructorDeclaration(member)) {
         return 'constructor';
     }
     if (!member.name) {
         return null;
     }
-    if (ts.isIdentifier(member.name) || ts.isStringLiteral(member.name)) {
+    if (ast.isIdentifier(member.name) || ast.isStringLiteral(member.name)) {
         return member.name.text;
     }
-    if (ts.isComputedPropertyName(member.name)) {
+    if (ast.isComputedPropertyName(member.name)) {
         return member.name.getText();
     }
     return null;
@@ -231,47 +231,47 @@ function collectFile(sourceFile, relPath, sink) {
 function collectStatement(statement, context) {
     const { relPath } = context;
 
-    if (ts.isClassDeclaration(statement) || ts.isInterfaceDeclaration(statement)) {
+    if (ast.isClassDeclaration(statement) || ast.isInterfaceDeclaration(statement)) {
         collectGroup(statement, statement.name?.text || 'default', context);
         return;
     }
 
-    if (ts.isTypeAliasDeclaration(statement)) {
+    if (ast.isTypeAliasDeclaration(statement)) {
         addData(statement, statement.name.text, 'type', context);
         return;
     }
 
-    if (ts.isEnumDeclaration(statement)) {
+    if (ast.isEnumDeclaration(statement)) {
         addData(statement, statement.name.text, 'enum', context);
         return;
     }
 
-    if (ts.isFunctionDeclaration(statement)) {
+    if (ast.isFunctionDeclaration(statement)) {
         const name = statement.name?.text || 'default';
         addFunction(statement, name, fileId(relPath), context);
         return;
     }
 
-    if (ts.isVariableStatement(statement)) {
+    if (ast.isVariableStatement(statement)) {
         for (const declaration of statement.declarationList.declarations) {
             collectVariableDeclaration(declaration, statement, context);
         }
         return;
     }
 
-    if (ts.isExpressionStatement(statement) && ts.isCallExpression(statement.expression)) {
+    if (ast.isExpressionStatement(statement) && ast.isCallExpression(statement.expression)) {
         collectTestCall(statement.expression, context, fileId(relPath), []);
         return;
     }
 
-    if (ts.isExportAssignment(statement) && isFunctionLike(statement.expression)) {
+    if (ast.isExportAssignment(statement) && isFunctionLike(statement.expression)) {
         addFunction(statement.expression, 'default', fileId(relPath), context, statement);
         return;
     }
 
     // `export default class/function ...` arrives as a declaration with an
     // export modifier and is handled above; anything else has no graph node.
-    if (ts.isModuleDeclaration(statement) && statement.body && ts.isModuleBlock(statement.body)) {
+    if (ast.isModuleDeclaration(statement) && statement.body && ast.isModuleBlock(statement.body)) {
         for (const inner of statement.body.statements) {
             collectStatement(inner, context);
         }
@@ -280,12 +280,12 @@ function collectStatement(statement, context) {
 
 function collectVariableDeclaration(declaration, statement, context) {
     const { relPath, sink } = context;
-    if (!ts.isIdentifier(declaration.name) || !declaration.initializer) {
+    if (!ast.isIdentifier(declaration.name) || !declaration.initializer) {
         return;
     }
     const name = declaration.name.text;
 
-    if (ts.isClassExpression(declaration.initializer)) {
+    if (ast.isClassExpression(declaration.initializer)) {
         collectGroup(declaration.initializer, name, context, statement);
         sink.idByDeclaration.set(declaration, groupId(relPath, name));
         return;
@@ -310,7 +310,7 @@ function collectVariableDeclaration(declaration, statement, context) {
 function collectGroup(node, name, context, docAnchor = null) {
     const { sourceFile, relPath, sink } = context;
     const id = groupId(relPath, name);
-    const kindLabel = ts.isInterfaceDeclaration(node) ? 'interface' : 'class';
+    const kindLabel = ast.isInterfaceDeclaration(node) ? 'interface' : 'class';
 
     sink.nodes.push({
         id,
@@ -338,17 +338,17 @@ function collectGroup(node, name, context, docAnchor = null) {
         const qualified = `${name}.${memberIdName}`;
 
         if (
-            ts.isMethodDeclaration(member) ||
-            ts.isConstructorDeclaration(member) ||
-            ts.isGetAccessorDeclaration(member) ||
-            ts.isSetAccessorDeclaration(member) ||
-            ts.isMethodSignature(member)
+            ast.isMethodDeclaration(member) ||
+            ast.isConstructorDeclaration(member) ||
+            ast.isGetAccessorDeclaration(member) ||
+            ast.isSetAccessorDeclaration(member) ||
+            ast.isMethodSignatureDeclaration(member)
         ) {
             addFunction(member, qualified, id, context);
-        } else if (ts.isPropertyDeclaration(member) && isFunctionLike(member.initializer)) {
+        } else if (ast.isPropertyDeclaration(member) && isFunctionLike(member.initializer)) {
             addFunction(member.initializer, qualified, id, context, member);
             sink.idByDeclaration.set(member, functionId(relPath, qualified));
-        } else if (ts.isPropertyDeclaration(member) || ts.isPropertySignature(member)) {
+        } else if (ast.isPropertyDeclaration(member) || ast.isPropertySignatureDeclaration(member)) {
             // A field is part of the shape of the thing that declares it.
             addData(member, qualified, 'field', context, { parentId: id, initializer: member.initializer });
         }
@@ -385,7 +385,7 @@ function collectTestCall(call, context, parentId, trail) {
         });
 
         for (const statement of body.body?.statements || []) {
-            if (ts.isExpressionStatement(statement) && ts.isCallExpression(statement.expression)) {
+            if (ast.isExpressionStatement(statement) && ast.isCallExpression(statement.expression)) {
                 collectTestCall(statement.expression, context, id, path);
             }
         }
@@ -423,7 +423,7 @@ function addTest(call, body, label, { role, parentId, trail, context }) {
         hash: hashOf(code),
         exported: false,
         isStatic: false,
-        isAsync: Boolean(body.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.AsyncKeyword)),
+        isAsync: Boolean(body.modifiers?.some(modifier => modifier.kind === ast.SyntaxKind.AsyncKeyword)),
     });
 
     // Its body is walked for calls like any other function's.
