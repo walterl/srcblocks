@@ -1,0 +1,1402 @@
+/*
+ * Themes are nothing but tokens: every rule below reads from them and never
+ * names a colour of its own, so a new theme is one block and no more.
+ *
+ * What a theme does NOT have to say is here, on its own: the type, and the four
+ * solid colours derived from the parts a theme gives them. Leaving these in a
+ * palette block is how eleven themes once lost their diff colours and their
+ * font at a stroke - `tools/themes.js` now says so out loud.
+ */
+:root {
+    --font: 13px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    /* The washes behind rows and nodes are these same colours at low alpha,
+       which is why a theme keeps each one as its parts. */
+    --accent: rgb(var(--accent-rgb));
+    --added: rgb(var(--added-rgb));
+    --changed: rgb(var(--changed-rgb));
+    --removed: rgb(var(--removed-rgb));
+}
+
+/*
+ * The canvas opens in this one - Catppuccin Mocha, soft pastels on a
+ * violet-tinted night - and every other theme, this one's own entry in the
+ * picker included, is a block in themes.css that says the same things again.
+ */
+:root,
+[data-theme='catppuccin'] {
+    color-scheme: dark;
+
+    /* Surfaces. Code gets its own, and it is the flattest of them: the
+       source is what the canvas is for, so nothing is tinted behind it. */
+    --bg: #181825;
+    --panel: #1e1e2e;
+    --border: #313244;
+    --input-bg: #181825;
+    --code-bg: #1e1e2e;
+    --overlay: rgba(24, 24, 37, 0.94);
+    --tooltip-bg: #313244;
+    --container-bg: rgba(49, 50, 68, 0.5);
+    --inside-bg: rgba(205, 214, 244, 0.04);
+    --shadow: rgba(0, 0, 0, 0.6);
+
+    /* Type */
+    --text: #cdd6f4;
+    --muted: #a6adc8;
+    --line-number: #6c7086;
+    --on-accent: #181825;
+    --hidden-opacity: 0.32;
+    --glow: none;
+
+    /* What the colours mean */
+    --accent-rgb: 137, 180, 250;
+    --added-rgb: 166, 227, 161;
+    --changed-rgb: 249, 226, 175;
+    --removed-rgb: 243, 139, 168;
+    --accent-bright: #b4d3ff;
+    --added-bright: #c6f2c2;
+    --removed-bright: #f8b3c6;
+    --test: #cba6f7;
+    --edge: #585b70;
+    --row-empty: rgba(108, 112, 134, 0.2);
+    --wash: 137, 180, 250;
+
+    /* One step per level of nesting */
+    --module: #1b1b29;
+    --file: #1e1e2e;
+    --group: #232336;
+    --function: #26263c;
+
+    /* Syntax */
+    --syn-plain: #cdd6f4;
+    --syn-comment: #7f83a0;
+    --syn-comment-style: italic;
+    --syn-keyword: #cba6f7;
+    --syn-type: #f9e2af;
+    --syn-title: #89b4fa;
+    --syn-string: #a6e3a1;
+    --syn-number: #fab387;
+}
+
+* { box-sizing: border-box; }
+
+/* Whatever the theme, the reader can see what is focused and what is picked. */
+:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+::selection {
+    background: rgba(var(--accent-rgb), 0.35);
+    color: var(--text);
+}
+::placeholder {
+    color: var(--muted);
+    opacity: 1;
+}
+
+body {
+    margin: 0;
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font: var(--font);
+}
+
+h1 { font-size: 15px; margin: 0 0 2px; color: var(--accent-bright); text-shadow: var(--glow); }
+h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0 0 8px; }
+.muted { color: var(--muted); }
+
+/* ---------- sidebar ---------- */
+
+/*
+ * An accordion: an open section takes the room the closed ones are not using
+ * and scrolls inside itself, so the sidebar is never part empty and part cut
+ * off. The window is the height; nothing here scrolls as a whole.
+ */
+#sidebar {
+    width: 320px;
+    flex: 0 0 320px;
+    border-right: 1px solid var(--border);
+    background: var(--panel);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.sidebar-header { flex: none; padding: 14px 14px 6px; }
+.sidebar-header p { margin: 0; font-size: 11px; word-break: break-all; }
+
+.panel {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border-top: 1px solid var(--border);
+}
+/* Open sections share the height evenly, and a section that needs less than
+   its share is held to what it needs so the rest goes to the others. */
+.panel.open { flex: 1 1 0; max-height: max-content; }
+/* With no commits to list, the branch section has nothing to grow into. */
+#branch-panel.open:has(#commits-panel[hidden]) { flex: 0 0 auto; }
+.panel-header {
+    flex: none;
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    width: 100%;
+    padding: 9px 14px;
+    background: none;
+    border: none;
+    border-radius: 0;
+    text-align: left;
+}
+.panel-header:hover { background: rgba(var(--wash), 0.08); color: var(--text); }
+.panel-chevron { color: var(--muted); width: 9px; flex: none; }
+.panel-title { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.panel-summary {
+    flex: 1;
+    min-width: 0;
+    color: var(--accent);
+    font-size: 11px;
+    text-align: right;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* A summary too long for the heading row gets a line of its own, in full. */
+.panel-header.stacked { display: block; }
+.panel-heading { display: flex; align-items: baseline; gap: 6px; }
+.panel-header.stacked .panel-summary {
+    display: block;
+    padding: 2px 0 0 15px;
+    text-align: left;
+    white-space: normal;
+    overflow: visible;
+    word-break: break-all;
+}
+.panel-body { padding: 0 14px 12px; }
+.panel.open > .panel-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.panel:not(.open) > .panel-body { display: none; }
+.panel:not(.open) { flex: none; }
+.panel-subtitle { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 14px 0 6px; }
+.row { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+
+button, select, input {
+    background: var(--input-bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 5px 8px;
+    font: inherit;
+}
+button { cursor: pointer; }
+button:hover { border-color: var(--accent); color: var(--accent); }
+button[aria-pressed='true'] { border-color: var(--accent); color: var(--accent); background: rgba(var(--wash), 0.14); }
+button:disabled { opacity: 0.45; cursor: default; }
+button:disabled:hover { border-color: var(--border); color: inherit; }
+input, select { width: 100%; }
+select { margin-top: 6px; }
+select option { padding: 2px 4px; }
+
+.field { display: block; margin-top: 8px; }
+.field[hidden] { display: none; }
+.field-label { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.field input, .field select { margin-top: 3px; }
+
+.commit-list { list-style: none; margin: 8px 0 0; padding: 0; }
+.commit-list li { border-bottom: 1px solid var(--border); }
+.commit-list label { display: flex; gap: 6px; padding: 6px 2px; cursor: pointer; align-items: baseline; }
+.commit-list input { width: auto; margin: 0; }
+.commit-subject { flex: 1; }
+.commit-sha { color: var(--muted); font-family: ui-monospace, monospace; font-size: 11px; cursor: copy; }
+.commit-sha:hover { color: var(--accent); }
+.commit-sha.copied { color: var(--added); }
+.commit-stats { color: var(--muted); font-size: 10px; white-space: nowrap; }
+
+/* The foot of the sidebar: what the colours mean, and which set of them. */
+.sidebar-footer {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: auto 0 0;
+    padding: 8px 14px;
+    border-top: 1px solid var(--border);
+}
+.legend { list-style: none; flex: 1; display: flex; gap: 12px; padding: 0; margin: 0; font-size: 11px; }
+#theme-select {
+    width: auto;
+    flex: none;
+    padding: 2px 4px;
+    margin: 0;
+    font-size: 11px;
+    color: var(--muted);
+}
+#theme-select:hover { color: var(--accent); border-color: var(--accent); }
+.legend li { display: flex; align-items: center; gap: 5px; }
+.swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.swatch.status-added { background: var(--added); }
+.swatch.status-changed { background: var(--changed); }
+.swatch.status-removed { background: var(--removed); }
+.hint { font-size: 11px; margin: 10px 0 0; }
+
+/* ---------- file tree ---------- */
+
+.file-tree { margin: 0 -14px; }
+/* Folding the whole tree, above the tree it folds. */
+#files-body > .row { margin: 0 0 8px; }
+.tree-row {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    width: 100%;
+    padding: 2px 8px 2px 6px;
+    background: none;
+    border: none;
+    border-radius: 0;
+    text-align: left;
+    font-size: 11px;
+    white-space: nowrap;
+}
+.tree-row:hover { background: rgba(var(--wash), 0.12); color: var(--text); }
+.tree-chevron { color: var(--muted); width: 9px; flex: none; }
+.tree-name { overflow: hidden; text-overflow: ellipsis; }
+.tree-file .tree-name,
+.tree-group .tree-name,
+.tree-leaf .tree-name { font-family: ui-monospace, monospace; }
+/* What the diff touched inside a file, fenced off from the paths above it. */
+.tree-inside {
+    margin: 1px 10px 5px 15px;
+    padding: 3px 0;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--inside-bg);
+}
+
+/* What the diff touched inside a file reads as detail under it. */
+.tree-group > .tree-row,
+.tree-leaf > .tree-row { font-size: 11px; color: var(--muted); }
+.tree-chevron.foldable { cursor: pointer; }
+.tree-chevron.foldable:hover { color: var(--accent); }
+.tree-dir > .tree-row .tree-name { color: var(--accent); }
+.tree-row.status-added .tree-name { color: var(--added); }
+.tree-row.status-changed .tree-name { color: var(--changed); }
+.tree-row.status-removed .tree-name { color: var(--removed); text-decoration: line-through; }
+
+/* ---------- stage ---------- */
+
+#stage { flex: 1; position: relative; overflow: hidden; }
+
+#status-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 36;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 5px 12px;
+    background: var(--overlay);
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--muted);
+}
+
+#status-text {
+    text-shadow: var(--glow);
+    flex: 1;
+    min-width: 0;
+    padding-left: 12px;
+    /* Reported at the far end of the bar, away from the controls. */
+    text-align: right;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ---------- toolbar ---------- */
+
+.toolbar { display: flex; align-items: center; gap: 12px; flex: none; flex-wrap: nowrap; }
+.toolbar-group { display: flex; align-items: center; gap: 4px; flex-wrap: nowrap; }
+.toolbar-group + .toolbar-group { padding-left: 12px; border-left: 1px solid var(--border); }
+
+/* The icon sprite is markup, not a picture: it never draws anything itself. */
+#icons { display: none; }
+
+.icon-glyph {
+    width: 15px;
+    height: 15px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+/* Folded away, the sidebar button points the other way. */
+button.icon.flipped .icon-glyph { transform: scaleX(-1); }
+
+button.icon {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    padding: 0;
+    line-height: 1;
+    font-size: 13px;
+    color: var(--muted);
+}
+#status-bar button,
+#status-bar input[type='search'] { height: 24px; background: var(--input-bg); }
+#status-bar input[type='search'] { padding: 0 8px; }
+#search-form { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; }
+#search-form input[type='search'] { width: 190px; }
+#search-form .checkbox { font-family: ui-monospace, monospace; }
+
+body.sidebar-collapsed #sidebar { display: none; }
+
+/*
+ * Dragging on the canvas pans it, so a drag must not leave node names and
+ * labels highlighted behind it. Source is the exception: code is there to be
+ * read and copied. Only the code itself selects, not the line numbers or diff
+ * markers beside it, so what is copied out is what the file says.
+ */
+#viewport { position: absolute; inset: 0; cursor: grab; user-select: none; }
+#viewport .code-text { user-select: text; }
+
+/*
+ * Reading a branch means parsing every revision it touches, which is seconds of
+ * nothing happening the first time. This says so, over the canvas being
+ * replaced rather than beside it.
+ */
+#loading {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    z-index: 45;
+    transform: translate(-50%, -50%);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    max-width: 70%;
+    padding: 12px 18px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--overlay);
+    box-shadow: 0 8px 24px var(--shadow);
+    color: var(--text);
+    font-size: 12px;
+}
+#loading[hidden] { display: none; }
+
+.spinner {
+    flex: none;
+    width: 15px;
+    height: 15px;
+    border: 2px solid rgba(var(--accent-rgb), 0.25);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+/* Something still has to say it is working when motion is unwelcome. */
+@media (prefers-reduced-motion: reduce) {
+    .spinner { animation: pulse 1.6s ease-in-out infinite; }
+    @keyframes pulse {
+        50% { opacity: 0.35; }
+    }
+}
+#viewport.panning { cursor: grabbing; }
+
+#world { position: absolute; transform-origin: 0 0; }
+#edge-layer { position: absolute; top: 0; left: 0; overflow: visible; pointer-events: none; }
+/* The same edges, drawn over the nodes: a followed call is never buried.
+   Nodes stack by nesting depth, so this clears the deepest of them. */
+#edge-highlight-layer { position: absolute; top: 0; left: 0; z-index: 50; overflow: visible; pointer-events: none; }
+#node-layer { position: absolute; top: 0; left: 0; }
+
+/*
+ * Where the next canvas is built and measured while the current one stays on
+ * screen. Zero-sized and hidden; the nodes inside it are absolutely positioned,
+ * so they measure at their natural size regardless.
+ */
+#measure-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 0;
+    height: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+/* ---------- nodes ---------- */
+
+.node {
+    position: absolute;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--function);
+    overflow: hidden;
+}
+
+.node-header {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    padding: 5px 8px;
+    cursor: grab;
+    white-space: nowrap;
+}
+.node.dragging { cursor: grabbing; opacity: 0.92; }
+.node.dragging .node-header { cursor: grabbing; }
+.node-header:hover { background: rgba(var(--wash), 0.1); }
+
+.chev { color: var(--muted); width: 9px; display: inline-block; }
+.node-kind { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; }
+.node-name { font-weight: 600; font-family: ui-monospace, monospace; }
+.node-meta { color: var(--muted); font-size: 10px; font-family: ui-monospace, monospace; }
+
+/*
+ * What the branch did to this node, in lines. Sits at the end of the header,
+ * which the buttons vacated for it.
+ */
+.node-diffstat {
+    display: inline-flex;
+    gap: 4px;
+    font-size: 10px;
+    font-family: ui-monospace, monospace;
+    font-weight: 600;
+}
+.diffstat-added { color: var(--added); }
+.diffstat-removed { color: var(--removed); }
+
+.node-export {
+    color: var(--accent);
+    border: 1px solid currentColor;
+    border-radius: 4px;
+    padding: 0 4px;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* A module or file narrowed to its exports: a setting, so drawn as one is pressed. */
+.node-exports-only {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    color: var(--accent);
+    background: rgba(var(--wash), 0.14);
+    border-radius: 4px;
+    padding: 0 4px;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.node-exports-only .icon-glyph { width: 10px; height: 10px; stroke-width: 1.8; }
+
+.node-export.export-added { color: var(--added); }
+.node-export.export-removed { color: var(--removed); text-decoration: line-through; }
+
+.node-diff,
+.node-maximise,
+.node-diff-view,
+.window-diff {
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: none;
+    color: var(--muted);
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 1px 5px;
+    line-height: 1.4;
+    cursor: pointer;
+}
+.node-diff:hover,
+.node-maximise:hover,
+.node-diff-view:hover,
+.window-diff:hover { color: var(--accent); border-color: var(--accent); }
+.node-maximise { font-family: ui-monospace, monospace; }
+
+.node.pinned { outline: 1px solid var(--accent); }
+
+/*
+ * A boundary, not a box: something outside the repository that data crosses to.
+ * The rounded pill says it holds nothing to open, a service gets the heavier
+ * outline of a thing that answers over a wire, and a library recedes - it is on
+ * the canvas only because something reaches it.
+ */
+.node.kind-external { border-radius: 14px; border-style: solid; background: var(--panel); }
+.node.kind-external.external-service { border-width: 2px; }
+.node.kind-external.external-library { opacity: 0.6; border-style: dotted; }
+.node.kind-external .node-glyph { margin-right: 6px; color: var(--accent); }
+
+.node.kind-module { background: var(--module); border-style: dashed; }
+.node.kind-file { background: var(--file); }
+.node.kind-group { background: var(--group); }
+.node.kind-module .node-name { color: var(--accent); }
+
+.node.container.expanded { background: var(--container-bg); }
+.node.container.expanded > .node-header { border-bottom: 1px solid var(--border); }
+
+.node.selected { outline: 2px solid var(--accent); }
+
+.node-body {
+    padding: 0;
+    background: var(--code-bg);
+    border-top: 1px solid var(--border);
+    max-height: 560px;
+    overflow: auto;
+    overscroll-behavior: contain;
+    /* Source is there to be read and copied, so the pointer says so; the grab
+       hand belongs to the canvas it sits on. */
+    cursor: text;
+}
+.node-doc {
+    margin: 0;
+    padding: 6px 8px;
+    color: var(--muted);
+    font-family: ui-monospace, monospace;
+    font-size: 11px;
+    white-space: pre;
+    border-bottom: 1px solid var(--border);
+}
+.node-doc.changed { border-left: 3px solid var(--changed); }
+
+.node-code.hljs {
+    background: transparent;
+    color: var(--syn-plain);
+}
+
+/*
+ * Syntax, in whatever light the theme casts. Structure is told apart by these
+ * seven tokens; anything they do not name is left to the highlight theme the
+ * page links, which is why they cover what code is mostly made of.
+ */
+.hljs-comment,
+.hljs-quote { color: var(--syn-comment); font-style: var(--syn-comment-style); }
+.hljs-keyword,
+.hljs-literal,
+.hljs-selector-tag,
+.hljs-doctag { color: var(--syn-keyword); }
+.hljs-built_in,
+.hljs-type,
+.hljs-class .hljs-title { color: var(--syn-type); }
+.hljs-title,
+.hljs-title.function_,
+.hljs-title.class_,
+.hljs-section,
+.hljs-name { color: var(--syn-title); }
+.hljs-string,
+.hljs-regexp,
+.hljs-template-tag,
+.hljs-meta .hljs-string { color: var(--syn-string); }
+.hljs-number,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-link { color: var(--syn-number); }
+.hljs-attr,
+.hljs-attribute,
+.hljs-property,
+.hljs-variable,
+.hljs-params { color: var(--syn-plain); }
+.hljs-meta,
+.hljs-deletion,
+.hljs-addition { color: var(--muted); background: none; }
+.hljs-emphasis { font-style: italic; }
+.hljs-strong { font-weight: 600; }
+
+.node-code {
+    margin: 0;
+    padding: 6px 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px;
+    line-height: 1.5;
+    /* As wide as its widest line, so that every line - and the background
+       behind it - reaches the end of what can be scrolled to. */
+    width: max-content;
+    min-width: 100%;
+}
+
+/*
+ * Source is read 80 columns wide; anything longer scrolls rather than stretching
+ * the node across the canvas. The gutter and markers sit outside those columns.
+ *
+ * The box that scrolls is the body, not the code inside it: a scrollbar at the
+ * foot of the code is a scrollbar at the foot of a thousand lines, out of sight
+ * until the reader has scrolled all the way down to look for it.
+ */
+.node .node-body { max-width: calc(80ch + 72px); }
+/* Two of those columns, plus the rule between them, so the pair fits without a
+   scrollbar of its own: each side scrolls itself. */
+.node .node-body:has(.code-split) { max-width: calc(160ch + 145px); }
+
+.code-row { display: flex; align-items: flex-start; padding: 0 8px; min-width: 100%; }
+.code-number {
+    flex: 0 0 36px;
+    padding-right: 10px;
+    text-align: right;
+    color: var(--line-number);
+    user-select: none;
+}
+.code-marker { flex: 0 0 10px; color: var(--muted); user-select: none; }
+.code-text { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre; }
+
+.code-split { display: flex; align-items: stretch; width: max-content; min-width: 100%; }
+/*
+ * Each side of a diff is read on its own, eighty columns of it at a time, and
+ * scrolls itself when a line runs past that: one column overrunning must not
+ * push the other off the side of the node, and the two are kept level in JS so
+ * a line and what it became stay opposite each other.
+ */
+.code-split > .code-side {
+    flex: 0 0 auto;
+    width: calc(80ch + 72px);
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+.code-side + .code-side { border-left: 1px solid var(--border); }
+.code-row.line-empty { background: var(--row-empty); min-height: 1.5em; }
+
+/* The commit behind a line, offered when the pointer is on that line. */
+.code-blame {
+    position: sticky;
+    right: 4px;
+    margin-left: auto;
+    padding: 0 4px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    background: var(--panel);
+    color: var(--muted);
+    font-family: ui-monospace, monospace;
+    font-size: 9px;
+    line-height: 1.4;
+    visibility: hidden;
+}
+.code-row:hover .code-blame { visibility: visible; }
+.code-blame:hover { color: var(--accent); border-color: var(--accent); }
+
+.code-row.line-added { background: rgba(var(--added-rgb), 0.22); }
+.code-row.line-added .code-marker { color: var(--added); }
+.code-row.line-removed { background: rgba(var(--removed-rgb), 0.22); }
+.code-row.line-removed .code-marker { color: var(--removed); }
+.code-row.line-removed .code-text { opacity: 0.8; }
+/* What changed within an edited line, against the line it replaced. */
+.code-row.line-added .code-change { background: rgba(var(--added-rgb), 0.45); }
+.code-row.line-removed .code-change { background: rgba(var(--removed-rgb), 0.45); }
+
+/* diff status */
+.node.status-added { border-color: var(--added); background: rgba(var(--added-rgb), 0.12); }
+.node.status-changed { border-color: var(--changed); background: rgba(var(--changed-rgb), 0.12); }
+.node.status-removed { border-color: var(--removed); background: rgba(var(--removed-rgb), 0.14); }
+.node.status-added > .node-header .node-name { color: var(--added); }
+.node.status-changed > .node-header .node-name { color: var(--changed); }
+.node.status-removed > .node-header .node-name { color: var(--removed); text-decoration: line-through; }
+
+/* ---------- edges ---------- */
+
+.edge { fill: none; stroke: var(--edge); stroke-width: 1.4px; }
+.edge.status-added { stroke: var(--added); stroke-width: 2px; }
+.edge.status-changed { stroke: var(--changed); stroke-width: 2px; }
+.edge.status-removed { stroke: var(--removed); stroke-width: 2px; stroke-dasharray: 6 3; }
+.edge.dimmed { opacity: 0.18; }
+/* Reading or writing a constant is not calling it: the line is drawn finely
+   broken, so what reaches a table or a threshold is told from what calls a
+   function without being any less visible. */
+.edge.edge-access { stroke-dasharray: 2 3; }
+.edge.edge-access.status-removed { stroke-dasharray: 6 3; }
+/* Highlighting brightens an edge; what it says stays what it said. There is no
+   bright yellow to brighten a changed one to, so it keeps its own colour. */
+.edge.highlight { stroke: var(--accent-bright); stroke-width: 2.4px; }
+.edge.highlight.status-added { stroke: var(--added-bright); }
+.edge.highlight.status-changed { stroke: var(--changed); }
+.edge.highlight.status-removed { stroke: var(--removed-bright); }
+
+/*
+ * A hidden node: still there to be brought back, and saying nothing while it
+ * waits. The pointer on it brings it far enough back to read the way out.
+ */
+.node.hidden-node {
+    opacity: var(--hidden-opacity);
+    filter: grayscale(0.9);
+    border-style: dashed;
+}
+.node.hidden-node:hover { opacity: calc(var(--hidden-opacity) + 0.45); }
+.node.hidden-node .node-header { cursor: default; }
+
+.node-hide,
+.node-pin,
+.node-exports,
+.node-copy,
+.node-file {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 3px;
+    line-height: 1;
+    color: var(--muted);
+}
+.node-hide[aria-pressed='true'],
+.node-pin[aria-pressed='true'],
+.node-exports[aria-pressed='true'] { color: var(--accent); border-color: var(--accent); }
+.node-copy.copied { color: var(--added); border-color: var(--added); }
+.node-hide .icon-glyph,
+.node-pin .icon-glyph,
+.node-exports .icon-glyph,
+.node-copy .icon-glyph,
+.node-file .icon-glyph { width: 12px; height: 12px; stroke-width: 1.8; }
+
+/* Where the call leaves its caller - drawn only while the edge is followed. */
+.edge-dot { display: none; }
+.edge-dot.highlight { display: inline; fill: var(--accent-bright); }
+.edge-dot.highlight.status-added { fill: var(--added-bright); }
+.edge-dot.highlight.status-changed { fill: var(--changed); }
+.edge-dot.highlight.status-removed { fill: var(--removed-bright); }
+
+.edge-head { fill: var(--edge); }
+.edge-head.status-added { fill: var(--added); }
+.edge-head.status-changed { fill: var(--changed); }
+.edge-head.status-removed { fill: var(--removed); }
+.edge-head.highlight { fill: var(--accent-bright); }
+.edge-head.highlight.status-added { fill: var(--added-bright); }
+.edge-head.highlight.status-removed { fill: var(--removed-bright); }
+
+/* ---------- calls window ---------- */
+
+#calls-window {
+    position: absolute;
+    top: 44px;
+    right: 16px;
+    z-index: 30;
+    width: 440px;
+    max-height: 60vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px var(--shadow);
+}
+#calls-window[hidden] { display: none; }
+
+.calls-window-header {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+}
+/* A long path gives way to the controls beside it rather than pushing them out. */
+#file-title { overflow: hidden; }
+.code-window-name { overflow: hidden; text-overflow: ellipsis; }
+/* Only the close button is bare and pinned to the far end; anything else in a
+   window's header is a control like the ones on a node. */
+.window-close {
+    margin-left: auto;
+    border: none;
+    background: none;
+    color: var(--muted);
+    font-size: 16px;
+    line-height: 1;
+    padding: 0 2px;
+}
+.window-close:hover { color: var(--accent); }
+/* The dock toggle takes the free space in the header, so it sits against the
+   close button rather than against the title. */
+.window-dock {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    align-self: center;
+    border: none;
+    background: none;
+    color: var(--muted);
+    padding: 0 2px;
+}
+/* The free space is already spent getting the pair over here. */
+.window-dock + .window-close { margin-left: 0; }
+.window-dock:hover { color: var(--accent); }
+.window-dock[aria-pressed='true'] { color: var(--accent); background: none; border: none; }
+#calls-title { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+
+#calls-groups { overflow-y: auto; padding: 4px; }
+
+.calls-group + .calls-group { border-top: 1px solid var(--border); }
+.calls-group-header { display: flex; align-items: baseline; gap: 4px; padding: 2px 0; }
+.calls-group-header button { background: none; border: none; padding: 2px 4px; color: var(--text); }
+.calls-group-toggle { color: var(--muted); flex: none; }
+.calls-group-name { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 6px; text-align: left; }
+.calls-group-name:hover .calls-group-fn { color: var(--accent); text-decoration: underline; }
+.calls-group-fn { font-family: ui-monospace, monospace; font-weight: 600; }
+.calls-group-where {
+    color: var(--muted);
+    font-size: 10px;
+    font-family: ui-monospace, monospace;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.calls-group-count { color: var(--muted); font-size: 10px; flex: none; font-family: ui-monospace, monospace; }
+.calls-group-remove { color: var(--muted); flex: none; }
+.calls-group-remove:hover { color: var(--removed); }
+.calls-group:not(.open) .calls-group-fn { font-weight: 400; opacity: 0.75; }
+
+.calls-section { margin: 0 0 6px; }
+.calls-section-label {
+    display: block;
+    padding: 2px 0 2px 14px;
+    color: var(--muted);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+.calls-entries { list-style: none; margin: 0; padding: 0 0 0 14px; }
+/* A branch's contents sit under it, not indented again: the rows say how deep
+   they are themselves, so the list keeps its full width for names. */
+.calls-entries.nested { padding: 0; }
+
+/* One module, file or class holding part of the list, and its two controls. */
+.calls-branch-head { display: flex; align-items: stretch; }
+.calls-branch-row {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 3px 6px;
+    color: var(--muted);
+}
+.calls-branch-row { flex: 1; min-width: 0; }
+.calls-branch-row:hover { background: rgba(var(--wash), 0.12); color: var(--text); }
+.calls-branch-chevron { flex: none; width: 9px; }
+.calls-branch-kind {
+    flex: none;
+    font-size: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.calls-branch-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: ui-monospace, monospace;
+    color: var(--accent);
+}
+.calls-branch-row:hover .calls-branch-name { color: var(--accent-bright); }
+.calls-branch-count { flex: none; font-size: 10px; font-family: ui-monospace, monospace; }
+
+/*
+ * Opens or folds everything below in one go. Faint until the row it belongs to
+ * is under the pointer: on every branch at once it would read as a column of
+ * controls down the side of the list rather than as something to do to a row.
+ */
+.calls-deep-fold {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    padding: 0 4px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: none;
+    color: var(--muted);
+    opacity: 0.35;
+}
+.calls-deep-fold .icon-glyph { width: 11px; height: 11px; }
+.calls-branch-head:hover .calls-deep-fold,
+.calls-group-header:hover .calls-deep-fold { opacity: 1; }
+.calls-deep-fold:hover { color: var(--accent); border-color: var(--accent); opacity: 1; }
+.calls-deep-fold:focus-visible { opacity: 1; }
+.calls-entry {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 4px 6px;
+}
+.calls-entry:hover { background: rgba(var(--wash), 0.12); border-color: var(--accent); }
+.calls-entry-name { font-family: ui-monospace, monospace; }
+.calls-entry-where {
+    color: var(--muted);
+    font-size: 10px;
+    font-family: ui-monospace, monospace;
+    margin-left: auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.calls-entry-count { color: var(--muted); font-size: 10px; }
+/* A test reaching into the code, told apart from code calling code. */
+.calls-entry-role {
+    flex: none;
+    padding: 0 4px;
+    border: 1px solid currentColor;
+    border-radius: 3px;
+    color: var(--test);
+    font-size: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+/* Which way a constant is reached, on the row that reaches it. */
+.calls-entry-access {
+    flex: none;
+    padding: 0 4px;
+    border-radius: 3px;
+    background: rgba(var(--wash), 0.16);
+    color: var(--muted);
+    font-size: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.calls-entry.is-test { box-shadow: inset 2px 0 0 var(--test); }
+.calls-entry.is-test .calls-entry-name { color: var(--test); }
+.calls-entry.is-test .calls-entry-name.status-added { color: var(--added); }
+.calls-entry.is-test .calls-entry-name.status-changed { color: var(--changed); }
+.calls-entry.is-test .calls-entry-name.status-removed { color: var(--removed); }
+
+/* What the branch did to the call, as a diff line does it. */
+.calls-entry.call-added { background: rgba(var(--added-rgb), 0.16); }
+.calls-entry.call-removed { background: rgba(var(--removed-rgb), 0.16); }
+.calls-entry.call-added:hover { background: rgba(var(--added-rgb), 0.26); }
+.calls-entry.call-removed:hover { background: rgba(var(--removed-rgb), 0.26); }
+.calls-entry-call { flex: none; font-size: 10px; color: var(--muted); }
+.calls-entry-call.call-added { color: var(--added); }
+.calls-entry-call.call-removed { color: var(--removed); }
+
+.calls-entry-name.status-added,
+.calls-group-fn.status-added { color: var(--added); }
+.calls-entry-name.status-changed,
+.calls-group-fn.status-changed { color: var(--changed); }
+.calls-entry-name.status-removed,
+.calls-group-fn.status-removed { color: var(--removed); text-decoration: line-through; }
+.calls-empty { color: var(--muted); padding: 6px; font-size: 11px; }
+
+.node.flash { animation: flash 1.2s ease-out; }
+@keyframes flash {
+    0%, 60% { outline: 3px solid var(--accent); outline-offset: 2px; }
+    100% { outline: 3px solid transparent; outline-offset: 2px; }
+}
+
+/* The line a definition was followed to, inside the source that holds it. */
+.code-row.flash { animation: flash-row 1.2s ease-out; }
+@keyframes flash-row {
+    0%, 60% { background: rgba(var(--accent-rgb), 0.35); }
+}
+
+/* Held ctrl makes a name with a definition in the tree a link to it. */
+body.ctrl-held .code-ref:hover {
+    color: var(--accent);
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+/* ---------- maximised file ---------- */
+
+/*
+ * A node at the size of the canvas, which for every node is the file it lives
+ * in.
+ */
+#file-window {
+    position: absolute;
+    top: 44px;
+    bottom: 24px;
+    /*
+     * As wide as the code in it, and no wider - between eighty columns and the
+     * whole canvas. A file of short lines left two thirds of the screen empty
+     * behind a window that had reserved it, and what was behind it is the
+     * canvas the reader came from.
+     *
+     * `margin: auto` between two insets is what centres an absolutely
+     * positioned box of its own width, so the canvas is left showing evenly on
+     * both sides rather than all down one.
+     */
+    left: 16px;
+    right: 16px;
+    width: max-content;
+    max-width: calc(100% - 32px);
+    margin-inline: auto;
+    z-index: 34;
+    display: flex;
+    flex-direction: column;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 12px 40px var(--shadow);
+}
+#file-window[hidden] { display: none; }
+#file-title { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+/*
+ * The code itself, which is what the window is measured by. It carries the
+ * code's own font so that `ch` here means a column of source rather than a
+ * character of the header's; eighty of them is the width source is read at
+ * everywhere else, and the rest is the gutter beside them.
+ */
+#file-body {
+    overflow: auto;
+    padding: 0;
+    cursor: text;
+    min-width: calc(80ch + 72px);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px;
+}
+#file-body .node-code { padding: 8px 0; }
+/*
+ * The lines the file was opened for. The bar down the side marks every one of
+ * them, and the wash behind them gives way to a diff colour: that a line was
+ * added or removed is the more urgent thing to say about it, and a class's own
+ * lines cover most of what its file's diff touched.
+ */
+.code-row.line-focus { box-shadow: inset 3px 0 var(--accent); }
+.code-row.line-focus:not(.line-added):not(.line-removed):not(.line-empty) {
+    background: rgba(var(--accent-rgb), 0.16);
+}
+.code-window-name { font-family: ui-monospace, monospace; font-weight: 600; }
+.code-window-where { color: var(--muted); font-size: 11px; font-family: ui-monospace, monospace; }
+
+/*
+ * What the window is showing and how, beside what it is showing it of - so the
+ * eye finds them where it found the path. The path gives way to them, since it
+ * is the one thing in the row with no fixed length.
+ */
+.code-window-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: none;
+}
+.code-window-actions button { background: none; }
+
+/*
+ * A diff in the window gets the whole window: half each, and more than half if
+ * one side's lines are longer, in which case that side scrolls. Capping the
+ * pair at eighty columns each, as a node on the canvas is, left the window with
+ * empty space beside a diff that had room to spread out.
+ */
+#file-body .code-split { width: 100%; min-width: 100%; }
+/* Half each, whatever the window came out at: a diff is read across, and two
+   columns of different widths do not line up to be read that way. */
+#file-body .code-split > .code-side { flex: 1 1 0; width: auto; min-width: 0; }
+
+/* The calls list is how the reader moves; it stays on top of what is being read -
+   but below the header of what it is on top of, whose close button it would
+   otherwise cover. */
+#calls-window { z-index: 38; }
+body.reading-source #calls-window { top: 84px; }
+
+/*
+ * Docked, the calls list is a sidebar down the right of the canvas instead of a
+ * panel over it, and the canvas gives up the width rather than being covered:
+ * a long list of calls is read beside the nodes it is about. It keeps its place
+ * whatever is being read, since nothing is over it to clear.
+ */
+#calls-window.docked,
+body.reading-source #calls-window.docked {
+    top: 44px;
+    right: 0;
+    bottom: 0;
+    width: 380px;
+    max-height: none;
+    border-radius: 0;
+    border-right: 0;
+    border-bottom: 0;
+    box-shadow: none;
+}
+body.calls-docked #viewport { right: 380px; }
+
+/* ---------- diff window ---------- */
+
+#diff-window {
+    position: absolute;
+    top: 44px;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 35;
+    width: min(1100px, calc(100% - 48px));
+    display: flex;
+    flex-direction: column;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 12px 40px var(--shadow);
+}
+#diff-window[hidden] { display: none; }
+#diff-title { font-size: 12px; color: var(--muted); }
+
+#diff-body { overflow: auto; padding: 6px 10px 14px; }
+
+.diff-file + .diff-file { margin-top: 14px; }
+.diff-file-path {
+    display: block;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 6px 2px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    font-family: ui-monospace, monospace;
+    font-size: 11px;
+    color: var(--accent);
+}
+
+.diff-hunk {
+    margin-top: 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--code-bg);
+}
+.diff-hunk-heading {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    width: 100%;
+    text-align: left;
+    background: var(--row-empty);
+    border: none;
+    border-bottom: 1px solid var(--border);
+    padding: 4px 8px;
+}
+.diff-hunk-heading:hover { background: rgba(var(--wash), 0.15); }
+.diff-hunk-heading:hover .diff-hunk-name { text-decoration: underline; }
+.diff-hunk-name { font-family: ui-monospace, monospace; font-weight: 600; }
+.diff-hunk-name.status-added { color: var(--added); }
+.diff-hunk-name.status-changed { color: var(--changed); }
+.diff-hunk-name.status-removed { color: var(--removed); text-decoration: line-through; }
+.diff-hunk-status { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; }
+.diff-hunk-counts { margin-left: auto; color: var(--muted); font-size: 10px; font-family: ui-monospace, monospace; }
+/* The window scrolls as one document, sideways as well: a hunk that scrolls on
+   its own traps the wheel and hides its own scrollbar. */
+.diff-hunk .node-code { overflow: visible; }
+/* A commit's message, above its diff. */
+.diff-note {
+    margin: 0 0 12px;
+    padding: 10px 12px;
+    border-left: 3px solid var(--accent);
+    background: var(--panel);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 12px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+}
+
+.diff-empty { color: var(--muted); padding: 10px 2px; }
+
+/* ---------- search ---------- */
+
+.checkbox { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); }
+.checkbox input { width: auto; margin: 0; }
+
+#search-window {
+    position: absolute;
+    top: 44px;
+    left: 16px;
+    z-index: 30;
+    width: 380px;
+    max-height: 60vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px var(--shadow);
+}
+#search-window[hidden] { display: none; }
+#search-title { font-size: 12px; color: var(--muted); }
+
+#search-results { list-style: none; margin: 0; padding: 4px; overflow-y: auto; }
+.search-entry {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 4px 6px;
+}
+.search-entry:hover { background: rgba(var(--wash), 0.12); border-color: var(--accent); }
+.search-entry-heading { display: flex; align-items: baseline; gap: 6px; }
+.search-entry-kind { color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: 0.05em; }
+.search-entry-name { font-family: ui-monospace, monospace; }
+.search-entry-where { margin-left: auto; color: var(--muted); font-size: 10px; }
+.search-entry-path {
+    display: block;
+    color: var(--muted);
+    font-family: ui-monospace, monospace;
+    font-size: 10px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.search-entry-snippet {
+    display: block;
+    color: var(--muted);
+    font-family: ui-monospace, monospace;
+    font-size: 10px;
+    white-space: pre;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.search-empty { color: var(--muted); padding: 6px; font-size: 11px; }
+
+/* ---------- declaration changes ---------- */
+
+#changes-window {
+    position: absolute;
+    top: 44px;
+    left: 16px;
+    z-index: 32;
+    width: 400px;
+    max-height: 70vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px var(--shadow);
+}
+#changes-window[hidden] { display: none; }
+#changes-title { font-size: 12px; color: var(--muted); }
+
+#changes-filters { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+.changes-filter {
+    padding: 1px 6px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-radius: 10px;
+    color: var(--muted);
+}
+.changes-filter[aria-pressed='false'] { opacity: 0.45; background: none; }
+
+#changes-list { list-style: none; margin: 0; padding: 4px; overflow-y: auto; }
+.changes-file + .changes-file { margin-top: 8px; }
+.changes-file-path {
+    display: block;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 4px 6px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    color: var(--accent);
+    font-family: ui-monospace, monospace;
+    font-size: 10px;
+}
+.changes-file-items { list-style: none; margin: 0; padding: 2px 0 0; }
+.changes-entry {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 4px 6px;
+}
+.changes-entry:hover { background: rgba(var(--wash), 0.12); border-color: var(--accent); }
+.changes-entry-heading { display: flex; align-items: baseline; gap: 6px; }
+.changes-status {
+    flex: none;
+    min-width: 62px;
+    padding: 0 5px;
+    border-radius: 3px;
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    text-align: center;
+    color: var(--on-accent);
+}
+.changes-status.status-added { background: var(--added); }
+.changes-status.status-changed { background: var(--changed); }
+.changes-status.status-removed { background: var(--removed); }
+.changes-type { color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: 0.05em; }
+.changes-detail {
+    display: block;
+    padding-left: 68px;
+    font-family: ui-monospace, monospace;
+    font-size: 10px;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+.changes-detail.tone-added { color: var(--added); }
+.changes-detail.tone-removed { color: var(--removed); }
+.changes-detail.tone-note { color: var(--muted); font-style: italic; }
+.changes-name { font-family: ui-monospace, monospace; }
+.changes-name.status-added { color: var(--added); }
+.changes-name.status-changed { color: var(--changed); }
+.changes-name.status-removed { color: var(--removed); text-decoration: line-through; }
+.changes-where {
+    display: block;
+    padding-left: 68px;
+    color: var(--muted);
+    font-family: ui-monospace, monospace;
+    font-size: 10px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.changes-empty { color: var(--muted); padding: 8px; font-size: 11px; }
+
+/* ---------- node menu ---------- */
+
+/*
+ * The hovered node's actions, over the canvas rather than in it: drawn at the
+ * screen's size, so they stay usable at any zoom.
+ */
+#node-menu {
+    position: absolute;
+    z-index: 45;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 5px;
+    background: var(--tooltip-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    box-shadow: 0 6px 18px var(--shadow);
+}
+#node-menu[hidden] { display: none; }
+/* Every action in it reads as the same chip, over the menu's own backdrop. */
+#node-menu button { background: none; }
+
+/* ---------- tooltip ---------- */
+
+#tooltip {
+    position: absolute;
+    z-index: 40;
+    max-width: 340px;
+    padding: 6px 9px;
+    background: var(--tooltip-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    box-shadow: 0 6px 18px var(--shadow);
+    pointer-events: none;
+    font-size: 11px;
+    line-height: 1.5;
+}
+#tooltip[hidden] { display: none; }
+
+.tooltip-path { font-family: ui-monospace, monospace; word-break: break-all; }
+.tooltip-kind { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; }
+.tooltip-counts { color: var(--muted); }
+.tooltip-changes { display: flex; gap: 10px; margin-top: 3px; }
+.tooltip-change.status-added { color: var(--added); }
+.tooltip-change.status-changed { color: var(--changed); }
+.tooltip-change.status-removed { color: var(--removed); }

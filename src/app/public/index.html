@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>srcblocks</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>&#129521;</text></svg>" />
+    <link rel="stylesheet" href="/vendor/highlight/styles/github-dark.css" />
+    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/themes.css" />
+    <script>
+        // The reader's theme, before anything is painted in the wrong one.
+        try {
+            const chosen = localStorage.getItem('srcblocks-theme');
+            if (chosen) { document.documentElement.dataset.theme = chosen; }
+        } catch (error) {
+            /* A window that keeps nothing simply opens in the default. */
+        }
+    </script>
+</head>
+<body>
+    <!--
+        The toolbar's icons, drawn once and referenced by the buttons below.
+        Strokes only, so they take the colour of the button they sit in.
+    -->
+    <svg id="icons" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+        <symbol id="icon-sidebar" viewBox="0 0 24 24">
+            <rect x="3" y="4" width="18" height="16" rx="2" />
+            <path d="M10 4v16M7.5 10.5 6 12l1.5 1.5" />
+        </symbol>
+        <!-- The sidebar glyph, mirrored: the panel the calls list docks into. -->
+        <symbol id="icon-dock-right" viewBox="0 0 24 24">
+            <rect x="3" y="4" width="18" height="16" rx="2" />
+            <path d="M14 4v16M16.5 10.5 18 12l-1.5 1.5" />
+        </symbol>
+        <symbol id="icon-expand" viewBox="0 0 24 24">
+            <path d="M4 12h16M8 7.5 12 3.5l4 4M8 16.5l4 4 4-4" />
+        </symbol>
+        <symbol id="icon-collapse" viewBox="0 0 24 24">
+            <path d="M4 12h16M8 3.5 12 7.5l4-4M8 20.5l4-4 4 4" />
+        </symbol>
+        <symbol id="icon-close-sources" viewBox="0 0 24 24">
+            <rect x="3" y="4" width="18" height="16" rx="2" />
+            <path d="M8 14.5 12 10.5l4 4" />
+        </symbol>
+        <symbol id="icon-fit" viewBox="0 0 24 24">
+            <path d="M8 3.5H5.5a2 2 0 0 0-2 2V8M16 3.5h2.5a2 2 0 0 1 2 2V8M8 20.5H5.5a2 2 0 0 1-2-2V16M16 20.5h2.5a2 2 0 0 0 2-2V16" />
+        </symbol>
+        <symbol id="icon-focus" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="7" />
+            <circle cx="12" cy="12" r="2.5" />
+            <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+        </symbol>
+        <symbol id="icon-filter" viewBox="0 0 24 24">
+            <path d="M4 5h16l-6 7v6l-4 2v-8z" />
+        </symbol>
+        <symbol id="icon-copy" viewBox="0 0 24 24">
+            <rect x="9" y="9" width="11" height="11" rx="2" />
+            <path d="M15 5.5A1.5 1.5 0 0 0 13.5 4H5.5A1.5 1.5 0 0 0 4 5.5v8A1.5 1.5 0 0 0 5.5 15" />
+        </symbol>
+        <symbol id="icon-check" viewBox="0 0 24 24">
+            <path d="m5 12.5 4.5 4.5L19 7" />
+        </symbol>
+        <symbol id="icon-hide" viewBox="0 0 24 24">
+            <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" />
+            <circle cx="12" cy="12" r="3" />
+            <path d="m4 20 16-16" />
+        </symbol>
+        <symbol id="icon-show" viewBox="0 0 24 24">
+            <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" />
+            <circle cx="12" cy="12" r="3" />
+        </symbol>
+        <symbol id="icon-pin" viewBox="0 0 24 24">
+            <path d="M9 3.5h6M10 3.5v5.5l-3.5 4.5h11L14 9V3.5M12 13.5v7" />
+        </symbol>
+        <!-- What leaves the box: a module's exports. -->
+        <symbol id="icon-export" viewBox="0 0 24 24">
+            <path d="M10 5.5H5.5a1.5 1.5 0 0 0-1.5 1.5v11.5A1.5 1.5 0 0 0 5.5 20H17a1.5 1.5 0 0 0 1.5-1.5V14M14 4h6v6M20 4l-9 9" />
+        </symbol>
+        <symbol id="icon-search" viewBox="0 0 24 24">
+            <circle cx="10.5" cy="10.5" r="6" />
+            <path d="m15 15 4.5 4.5" />
+        </symbol>
+    </svg>
+    <aside id="sidebar">
+        <header class="sidebar-header">
+            <h1>srcblocks</h1>
+            <p id="repo-info" class="muted">Loading repository…</p>
+        </header>
+
+        <section class="panel open" id="branch-panel">
+            <button class="panel-header stacked" type="button" aria-expanded="true" aria-controls="branch-body">
+                <span class="panel-heading">
+                    <span class="panel-chevron">▾</span>
+                    <span class="panel-title">Branch</span>
+                </span>
+                <span class="panel-summary" id="branch-summary">none selected</span>
+            </button>
+            <div class="panel-body" id="branch-body">
+                <input id="branch-filter" type="search" placeholder="Filter branches" autocomplete="off" />
+                <select id="branch-select" size="8"></select>
+                <div class="field" id="base-field" hidden>
+                    <label class="field-label" for="base-select">Diff against</label>
+                    <input id="base-filter" type="search" placeholder="Filter branches" autocomplete="off" />
+                    <select id="base-select"></select>
+                </div>
+                <div class="row">
+                    <button id="branch-clear" type="button">Clear diff</button>
+                </div>
+
+                <div id="commits-panel" hidden>
+                    <h3 class="panel-subtitle">Commits <span id="commit-count" class="muted"></span></h3>
+                    <div class="row">
+                        <button id="commits-all" type="button">All</button>
+                        <button id="commits-none" type="button">None</button>
+                    </div>
+                    <ul id="commit-list" class="commit-list"></ul>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel open" id="files-panel">
+            <button class="panel-header" type="button" aria-expanded="true" aria-controls="files-body">
+                <span class="panel-chevron">▾</span>
+                <span class="panel-title">Files</span>
+                <span class="panel-summary" id="files-summary"></span>
+            </button>
+            <div class="panel-body" id="files-body">
+                <div class="row">
+                    <button id="files-expand" type="button">Expand all</button>
+                    <button id="files-collapse" type="button">Collapse all</button>
+                </div>
+                <div id="file-tree" class="file-tree"></div>
+            </div>
+        </section>
+
+        <footer class="sidebar-footer">
+            <ul class="legend">
+                <li><span class="swatch status-added"></span>added</li>
+                <li><span class="swatch status-changed"></span>changed</li>
+                <li><span class="swatch status-removed"></span>removed</li>
+            </ul>
+            <select id="theme-select" title="Theme">
+                <optgroup label="For this canvas">
+                    <option value="classic">Classic</option>
+                    <option value="terminal">Terminal</option>
+                    <option value="amber">Amber</option>
+                    <option value="ink">Ink</option>
+                    <option value="contrast">High contrast</option>
+                    <option value="paper">Paper</option>
+                </optgroup>
+                <optgroup label="Familiar">
+                    <option value="solarized-dark">Solarized Dark</option>
+                    <option value="solarized-light">Solarized Light</option>
+                    <option value="gruvbox">Gruvbox Dark</option>
+                    <option value="catppuccin">Catppuccin Mocha</option>
+                    <option value="nord">Nord</option>
+                    <option value="dracula">Dracula</option>
+                </optgroup>
+            </select>
+        </footer>
+    </aside>
+
+    <main id="stage">
+        <div id="status-bar">
+            <button id="sidebar-toggle" class="icon" type="button" title="Hide the sidebar"><svg class="icon-glyph"><use href="#icon-sidebar" /></svg></button>
+            <div class="toolbar">
+                <div class="toolbar-group">
+                    <button id="expand-all" class="icon" type="button" title="Expand everything"><svg class="icon-glyph"><use href="#icon-expand" /></svg></button>
+                    <button id="collapse-all" class="icon" type="button" title="Collapse everything"><svg class="icon-glyph"><use href="#icon-collapse" /></svg></button>
+                    <button id="collapse-sources" class="icon" type="button" title="Close every open source" disabled><svg class="icon-glyph"><use href="#icon-close-sources" /></svg></button>
+                    <button id="fit-view" class="icon" type="button" title="Frame everything"><svg class="icon-glyph"><use href="#icon-fit" /></svg></button>
+                    <button id="exports-only" class="icon" type="button" title="Show only what is exported" aria-pressed="false"><svg class="icon-glyph"><use href="#icon-export" /></svg></button>
+                </div>
+                <div class="toolbar-group">
+                    <button id="focus-changes" class="icon" type="button" title="Reopen the canvas on the current diff" disabled><svg class="icon-glyph"><use href="#icon-focus" /></svg></button>
+                    <button id="changes-only" class="icon" type="button" title="Show only what the branch touched" aria-pressed="false" disabled><svg class="icon-glyph"><use href="#icon-filter" /></svg></button>
+                </div>
+                <div class="toolbar-group">
+                    <button id="view-diff" type="button" disabled>Diff</button>
+                    <button id="view-declarations" type="button" disabled>Interfaces &amp; data</button>
+                </div>
+                <form id="search-form" class="toolbar-group">
+                    <input id="search-input" type="search" placeholder="Name, path or source" autocomplete="off" />
+                    <label class="checkbox" title="Read the query as a regular expression">
+                        <input id="search-regex" type="checkbox" /> .*
+                    </label>
+                    <button class="icon" type="submit" title="Search"><svg class="icon-glyph"><use href="#icon-search" /></svg></button>
+                </form>
+            </div>
+            <span id="status-text"></span>
+        </div>
+        <aside id="calls-window" hidden>
+            <header class="calls-window-header">
+                <span id="calls-title">Calls</span>
+                <button id="calls-dock" class="window-dock" type="button" title="Dock to the right" aria-pressed="false"><svg class="icon-glyph"><use href="#icon-dock-right" /></svg></button>
+                <button id="calls-close" class="window-close" type="button" title="Close">&times;</button>
+            </header>
+            <div id="calls-groups"></div>
+        </aside>
+        <aside id="file-window" hidden>
+            <header class="calls-window-header">
+                <span id="file-title"></span>
+                <button id="file-close" class="window-close" type="button" title="Close">&times;</button>
+            </header>
+            <div id="file-body"></div>
+        </aside>
+        <aside id="diff-window" hidden>
+            <header class="calls-window-header">
+                <span id="diff-title">Diff</span>
+                <button id="diff-close" class="window-close" type="button" title="Close">&times;</button>
+            </header>
+            <div id="diff-body"></div>
+        </aside>
+        <aside id="changes-window" hidden>
+            <header class="calls-window-header">
+                <span id="changes-title">Declarations</span>
+                <button id="changes-close" class="window-close" type="button" title="Close">&times;</button>
+            </header>
+            <div id="changes-filters"></div>
+            <ul id="changes-list"></ul>
+        </aside>
+        <aside id="search-window" hidden>
+            <header class="calls-window-header">
+                <span id="search-title">Search</span>
+                <button id="search-close" class="window-close" type="button" title="Close">&times;</button>
+            </header>
+            <ul id="search-results"></ul>
+        </aside>
+        <div id="viewport">
+            <div id="world">
+                <svg id="edge-layer" xmlns="http://www.w3.org/2000/svg"></svg>
+                <div id="node-layer"></div>
+                <svg id="edge-highlight-layer" xmlns="http://www.w3.org/2000/svg"></svg>
+            </div>
+            <div id="measure-layer" aria-hidden="true"></div>
+            <!-- What can be done to whichever node the pointer is resting on. -->
+            <div id="node-menu" role="toolbar" hidden></div>
+            <div id="tooltip" role="tooltip" hidden></div>
+            <div id="loading" role="status" aria-live="polite" hidden>
+                <span class="spinner" aria-hidden="true"></span>
+                <span id="loading-text"></span>
+            </div>
+        </div>
+    </main>
+
+    <script type="module" src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+    cat <<'EOF'
+Start srcblocks against a git repository.
+
+usage: srcblocks [repo-dir] [--include prefix[,prefix...]]
+
+  repo-dir     Repository to draw (default: current directory)
+  --include    Path prefixes to draw, comma-separated
+               (default: SRCBLOCKS_INCLUDE, or every top-level path in repo-dir)
+
+The server is the srcblocks checkout this script lives in. Open
+http://127.0.0.1:4173 once it is up.
+EOF
+}
+
+# Follow symlinks so a PATH / npm-bin wrapper still finds the app root.
+script=$0
+while [[ -L $script ]]; do
+    dir=$(cd "$(dirname "$script")" && pwd)
+    script=$(readlink "$script")
+    [[ $script == /* ]] || script=$dir/$script
+done
+app_root=$(cd "$(dirname "$script")/.." && pwd)
+
+repo=$PWD
+include=${SRCBLOCKS_INCLUDE-}
+repo_set=
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -h | --help)
+            usage
+            exit 0
+            ;;
+        --include=*)
+            include=${1#--include=}
+            shift
+            ;;
+        --include | -i)
+            if [[ $# -lt 2 ]]; then
+                echo "srcblocks: $1 requires an argument" >&2
+                exit 1
+            fi
+            include=$2
+            shift 2
+            ;;
+        --)
+            shift
+            break
+            ;;
+        -*)
+            echo "srcblocks: unknown option: $1" >&2
+            usage >&2
+            exit 1
+            ;;
+        *)
+            if [[ -n "$repo_set" ]]; then
+                echo "srcblocks: unexpected argument: $1" >&2
+                usage >&2
+                exit 1
+            fi
+            repo=$1
+            repo_set=1
+            shift
+            ;;
+    esac
+done
+
+if [[ ! -d "$repo" ]]; then
+    echo "srcblocks: not a directory: $repo" >&2
+    exit 1
+fi
+repo=$(cd "$repo" && pwd)
+
+if [[ -z "$include" ]]; then
+    shopt -s nullglob
+    names=()
+    for path in "$repo"/*; do
+        names+=("$(basename "$path")")
+    done
+    include=$(IFS=,; printf '%s' "${names[*]}")
+fi
+
+if [[ ! -d "$app_root/node_modules" ]]; then
+    echo "srcblocks: dependencies missing; run npm install in $app_root" >&2
+    exit 1
+fi
+
+export SRCBLOCKS_REPO="$repo"
+export SRCBLOCKS_INCLUDE="$include"
+
+cd "$app_root"
+exec node src/app/server.js

@@ -1,0 +1,51 @@
+{
+    "name": "srcblocks",
+    "version": "0.1.0",
+    "description": "Local-first, offline web app to visually navigate a source code tree and changes to it",
+    "keywords": [
+        "call-graph",
+        "code-review",
+        "git",
+        "diff",
+        "visualization",
+        "javascript",
+        "typescript"
+    ],
+    "homepage": "https://github.com/walterl/srcblocks#readme",
+    "bugs": "https://github.com/walterl/srcblocks/issues",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/walterl/srcblocks.git"
+    },
+    "license": "GPL-3.0-only",
+    "author": "Walter L <git@wrl.co.za>",
+    "private": true,
+    "main": "src/app/server.js",
+    "bin": {
+        "srcblocks": "./bin/srcblocks"
+    },
+    "type": "module",
+    "imports": {
+        "#srcblocks/*": "./src/*"
+    },
+    "engines": {
+        "node": ">=22.12.0"
+    },
+    "scripts": {
+        "start": "node src/app/server.js",
+        "analyze": "node scripts/analyze.js",
+        "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+        "format": "prettier --write \"{src,test,scripts,tools}/**/*.js\" \"*.js\"",
+        "format:check": "prettier --check \"{src,test,scripts,tools}/**/*.js\" \"*.js\""
+    },
+    "dependencies": {
+        "express": "^5.2.1",
+        "highlight.js": "^11.11.1",
+        "typescript": "^5.9.2"
+    },
+    "devDependencies": {
+        "jest": "^29.7.0",
+        "prettier": "^3.8.1",
+        "puppeteer-core": "^25.8.0"
+    }
+}

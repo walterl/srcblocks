@@ -1,0 +1,684 @@
+/*
+ * Every theme but the default, which lives in styles.css beside the rules that
+ * read it. A theme is a block of tokens and nothing else - what a rule paints
+ * is decided there, not here - except where a theme wants something the token
+ * set cannot say, which is the handful of scoped rules at the foot of this file.
+ *
+ * The first five were drawn for this canvas; the rest are the palettes people
+ * already read code in, mapped onto the same tokens.
+ */
+
+/*
+ * The palette this canvas wore first: GitHub's dark greys and blues, with the
+ * diff colours a reader of pull requests already knows.
+ */
+[data-theme='classic'] {
+    color-scheme: dark;
+
+    /* Surfaces */
+    --bg: #0d1117;
+    --panel: #161b22;
+    --border: #30363d;
+    --input-bg: #0d1117;
+    /* Code has a surface of its own, and it is the flattest one: source is what
+       the canvas is for, so nothing - not the node's own shade, not the wash
+       that says the branch touched it - is allowed to tint what is read on it. */
+    --code-bg: #0d1117;
+    --overlay: rgba(13, 17, 23, 0.9);
+    --tooltip-bg: #10161f;
+    --container-bg: rgba(31, 41, 55, 0.55);
+    --inside-bg: rgba(255, 255, 255, 0.02);
+    --shadow: rgba(0, 0, 0, 0.5);
+
+    /* Type */
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --line-number: #4d5866;
+    --on-accent: #0d1117;
+    /* How far a hidden node fades. A light page needs less of a fade to keep
+       it findable, which is why the theme decides. */
+    --hidden-opacity: 0.3;
+    --glow: none;
+
+    /* What the colours mean */
+    --accent-rgb: 88, 166, 255;
+    --added-rgb: 63, 185, 80;
+    --changed-rgb: 210, 153, 34;
+    --removed-rgb: 248, 81, 73;
+    /* Brighter versions, for the edges under the pointer. */
+    --accent-bright: #9ecbff;
+    --added-bright: #56d364;
+    --removed-bright: #ff7b72;
+    --test: #b083f0;
+    --edge: #6e7681;
+    --row-empty: rgba(110, 118, 129, 0.12);
+    /* The wash a hovered or pressed thing sits under. */
+    --wash: var(--accent-rgb);
+
+    /* One step darker per level of nesting. */
+    --module: #1f2937;
+    --file: #1b2430;
+    --group: #232c3b;
+    --function: #1c2333;
+
+    /* Syntax. The stock highlight theme paints what these leave alone. */
+    --syn-plain: #e6edf3;
+    --syn-comment: #8b949e;
+    --syn-comment-style: normal;
+    --syn-keyword: #ff7b72;
+    --syn-type: #ffa657;
+    --syn-title: #d2a8ff;
+    --syn-string: #a5d6ff;
+    --syn-number: #79c0ff;
+}
+
+/*
+ * A terminal at night: black glass and phosphor green.
+ *
+ * Brightness carries the meaning. The chrome - links, edges, headings,
+ * code - is a deeper green than anything a diff paints, so the neon green
+ * of an added function is never mistaken for decoration. Amber and red keep
+ * their jobs, and tests take a cool cyan: a picture that is otherwise green
+ * is what makes those three readable at a glance.
+ */
+[data-theme='terminal'] {
+    color-scheme: dark;
+
+    /* Surfaces. Code gets its own, and it is the flattest of them: the
+       source is what the canvas is for, so nothing is tinted behind it. */
+    --bg: #020705;
+    --panel: #06110b;
+    --border: #1c3a28;
+    --input-bg: #041009;
+    --code-bg: #010403;
+    --overlay: rgba(2, 12, 6, 0.92);
+    --tooltip-bg: #041009;
+    --container-bg: rgba(6, 22, 14, 0.62);
+    --inside-bg: rgba(58, 190, 130, 0.04);
+    --shadow: rgba(0, 0, 0, 0.6);
+
+    /* Type */
+    --text: #b6e2c4;
+    --muted: #5e8c6e;
+    --line-number: #3f6b4f;
+    --on-accent: #020705;
+    --hidden-opacity: 0.3;
+    --glow: 0 0 8px rgba(87, 240, 138, 0.18);
+
+    /* What the colours mean */
+    --accent-rgb: 47, 157, 107;
+    --added-rgb: 87, 240, 138;
+    --changed-rgb: 210, 164, 31;
+    --removed-rgb: 248, 81, 73;
+    --accent-bright: #4ac48d;
+    --added-bright: #9bffbd;
+    --removed-bright: #ff7b72;
+    --test: #63cddb;
+    --edge: #35704d;
+    --row-empty: rgba(94, 140, 110, 0.12);
+    --wash: 58, 190, 130;
+
+    /* One step per level of nesting */
+    --module: #061410;
+    --file: #081a11;
+    --group: #0a2116;
+    --function: #0b2618;
+
+    /* Syntax */
+    --syn-plain: #b6e2c4;
+    --syn-comment: #48755a;
+    --syn-comment-style: italic;
+    --syn-keyword: #79dfa2;
+    --syn-type: #8fe8bb;
+    --syn-title: #cdf5da;
+    --syn-string: #56c8ae;
+    --syn-number: #6fd6d6;
+}
+
+/*
+ * The other monochrome: a warm CRT, in monospace throughout, behind
+ * scanlines and a screen glow. "Changed" is a pale gold rather than the
+ * usual amber, because brightness is the only axis a one-hue theme has
+ * left to tell the chrome from what the diff is saying.
+ */
+[data-theme='amber'] {
+    color-scheme: dark;
+
+    /* Surfaces. Code gets its own, and it is the flattest of them: the
+       source is what the canvas is for, so nothing is tinted behind it. */
+    --bg: #0b0703;
+    --panel: #140d05;
+    --border: #3d2a10;
+    --input-bg: #100a04;
+    --code-bg: #080502;
+    --overlay: rgba(11, 7, 3, 0.94);
+    --tooltip-bg: #171006;
+    --container-bg: rgba(38, 25, 8, 0.5);
+    --inside-bg: rgba(255, 176, 60, 0.04);
+    --shadow: rgba(0, 0, 0, 0.7);
+
+    /* Type */
+    --font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace;
+    --text: #f0c27a;
+    --muted: #b0834a;
+    --line-number: #6b4a1c;
+    --on-accent: #0b0703;
+    --hidden-opacity: 0.28;
+    --glow: 0 0 9px rgba(255, 176, 60, 0.25);
+
+    /* What the colours mean */
+    --accent-rgb: 197, 130, 32;
+    --added-rgb: 126, 217, 87;
+    --changed-rgb: 255, 233, 176;
+    --removed-rgb: 255, 107, 107;
+    --accent-bright: #ffb347;
+    --added-bright: #b6f57f;
+    --removed-bright: #ff9d9d;
+    --test: #6fd6d6;
+    --edge: #7a5620;
+    --row-empty: rgba(154, 112, 56, 0.14);
+    --wash: 255, 176, 60;
+
+    /* One step per level of nesting */
+    --module: #150e06;
+    --file: #1a1207;
+    --group: #201709;
+    --function: #241a0a;
+
+    /* Syntax */
+    --syn-plain: #f0c27a;
+    --syn-comment: #94743a;
+    --syn-comment-style: italic;
+    --syn-keyword: #ffb347;
+    --syn-type: #ffcf8a;
+    --syn-title: #ffe6b8;
+    --syn-string: #d8a34a;
+    --syn-number: #6fd6d6;
+}
+
+/*
+ * Hue reserved entirely for meaning: greys for every surface, border, link
+ * and edge, so the only colours on screen are the three a diff paints.
+ * Syntax is grey too, carried by weight and brightness.
+ */
+[data-theme='ink'] {
+    color-scheme: dark;
+
+    /* Surfaces. Code gets its own, and it is the flattest of them: the
+       source is what the canvas is for, so nothing is tinted behind it. */
+    --bg: #101012;
+    --panel: #17171a;
+    --border: #34343a;
+    --input-bg: #101012;
+    --code-bg: #0c0c0e;
+    --overlay: rgba(16, 16, 18, 0.94);
+    --tooltip-bg: #1d1d21;
+    --container-bg: rgba(255, 255, 255, 0.035);
+    --inside-bg: rgba(255, 255, 255, 0.025);
+    --shadow: rgba(0, 0, 0, 0.6);
+
+    /* Type */
+    --text: #e8e8ea;
+    --muted: #93939b;
+    --line-number: #5a5a62;
+    --on-accent: #101012;
+    --hidden-opacity: 0.32;
+    --glow: none;
+
+    /* What the colours mean */
+    --accent-rgb: 176, 176, 186;
+    --added-rgb: 63, 185, 80;
+    --changed-rgb: 210, 153, 34;
+    --removed-rgb: 248, 81, 73;
+    --accent-bright: #f0f0f4;
+    --added-bright: #56d364;
+    --removed-bright: #ff7b72;
+    --test: #b8b8c2;
+    --edge: #5c5c64;
+    --row-empty: rgba(255, 255, 255, 0.06);
+    --wash: 200, 200, 210;
+
+    /* One step per level of nesting */
+    --module: #1a1a1e;
+    --file: #1e1e22;
+    --group: #222227;
+    --function: #26262c;
+
+    /* Syntax */
+    --syn-plain: #e8e8ea;
+    --syn-comment: #6f6f78;
+    --syn-comment-style: italic;
+    --syn-keyword: #ffffff;
+    --syn-type: #d0d0d6;
+    --syn-title: #f4f4f8;
+    --syn-string: #b4b4bc;
+    --syn-number: #c8c8d0;
+}
+
+/*
+ * Pure black, saturated hues, heavier borders and a slightly larger base
+ * size - for a bad monitor, a bright room, or tired eyes.
+ */
+[data-theme='contrast'] {
+    color-scheme: dark;
+
+    /* Surfaces. Code gets its own, and it is the flattest of them: the
+       source is what the canvas is for, so nothing is tinted behind it. */
+    --bg: #000000;
+    --panel: #0a0a0a;
+    --border: #4a4a4a;
+    --input-bg: #000000;
+    --code-bg: #000000;
+    --overlay: rgba(0, 0, 0, 0.95);
+    --tooltip-bg: #101010;
+    --container-bg: rgba(255, 255, 255, 0.05);
+    --inside-bg: rgba(255, 255, 255, 0.04);
+    --shadow: rgba(0, 0, 0, 0.85);
+
+    /* Type */
+    --font: 14px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --text: #ffffff;
+    --muted: #b9b9b9;
+    --line-number: #7a7a7a;
+    --on-accent: #000000;
+    --hidden-opacity: 0.35;
+    --glow: none;
+
+    /* What the colours mean */
+    --accent-rgb: 92, 178, 255;
+    --added-rgb: 61, 220, 100;
+    --changed-rgb: 255, 196, 0;
+    --removed-rgb: 255, 92, 84;
+    --accent-bright: #a9d4ff;
+    --added-bright: #7dff9f;
+    --removed-bright: #ff9d97;
+    --test: #d2a6ff;
+    --edge: #8c8c8c;
+    --row-empty: rgba(255, 255, 255, 0.08);
+    --wash: 92, 178, 255;
+
+    /* One step per level of nesting */
+    --module: #101010;
+    --file: #141414;
+    --group: #181818;
+    --function: #1c1c1c;
+
+    /* Syntax */
+    --syn-plain: #ffffff;
+    --syn-comment: #a0a0a0;
+    --syn-comment-style: normal;
+    --syn-keyword: #ff9d97;
+    --syn-type: #ffc46b;
+    --syn-title: #d2a6ff;
+    --syn-string: #9fe0ff;
+    --syn-number: #8cd2ff;
+}
+
+/*
+ * Daylight. Ink on off-white, thin borders, no glow, and diff colours dark
+ * enough that a wash behind a line still reads on paper - the opposite
+ * problem to every theme above.
+ */
+[data-theme='paper'] {
+    color-scheme: light;
+
+    /* Surfaces. Code gets its own, and it is the flattest of them: the
+       source is what the canvas is for, so nothing is tinted behind it. */
+    --bg: #f7f5ef;
+    --panel: #fffdf8;
+    --border: #d9d3c4;
+    --input-bg: #fffdf8;
+    --code-bg: #fffdf8;
+    --overlay: rgba(255, 253, 248, 0.96);
+    --tooltip-bg: #2c2a26;
+    --container-bg: rgba(0, 0, 0, 0.035);
+    --inside-bg: rgba(0, 0, 0, 0.025);
+    --shadow: rgba(60, 50, 30, 0.18);
+
+    /* Type */
+    --text: #24211c;
+    --muted: #6f6a5e;
+    --line-number: #8a8477;
+    --on-accent: #fffdf8;
+    --hidden-opacity: 0.5;
+    --glow: none;
+
+    /* What the colours mean */
+    --accent-rgb: 20, 90, 160;
+    --added-rgb: 26, 122, 60;
+    --changed-rgb: 150, 100, 12;
+    --removed-rgb: 178, 40, 40;
+    --accent-bright: #1c6fc4;
+    --added-bright: #12923f;
+    --removed-bright: #d13030;
+    --test: #6c3fb5;
+    --edge: #9b9384;
+    --row-empty: rgba(0, 0, 0, 0.05);
+    --wash: 20, 90, 160;
+
+    /* One step per level of nesting */
+    --module: #efece3;
+    --file: #f3f0e8;
+    --group: #f6f3ec;
+    --function: #fffdf8;
+
+    /* Syntax */
+    --syn-plain: #24211c;
+    --syn-comment: #8a8577;
+    --syn-comment-style: italic;
+    --syn-keyword: #a3204f;
+    --syn-type: #9a5b12;
+    --syn-title: #5a2ea6;
+    --syn-string: #1a6a4a;
+    --syn-number: #14568f;
+}
+
+/*
+ * Ethan Schoonover's palette, base03 through base1, with its own accents.
+ */
+[data-theme='solarized-dark'] {
+    color-scheme: dark;
+
+    /* Surfaces. Code gets its own, and it is the flattest of them: the
+       source is what the canvas is for, so nothing is tinted behind it. */
+    --bg: #002b36;
+    --panel: #073642;
+    --border: #0f4c5c;
+    --input-bg: #00252e;
+    --code-bg: #002028;
+    --overlay: rgba(0, 43, 54, 0.94);
+    --tooltip-bg: #073642;
+    --container-bg: rgba(7, 54, 66, 0.6);
+    --inside-bg: rgba(147, 161, 161, 0.05);
+    --shadow: rgba(0, 12, 16, 0.6);
+
+    /* Type */
+    --text: #93a1a1;
+    --muted: #587d81;
+    --line-number: #4a6b70;
+    --on-accent: #002b36;
+    --hidden-opacity: 0.32;
+    --glow: none;
+
+    /* What the colours mean */
+    --accent-rgb: 38, 139, 210;
+    --added-rgb: 133, 153, 0;
+    --changed-rgb: 181, 137, 0;
+    --removed-rgb: 220, 50, 47;
+    --accent-bright: #6fbaf0;
+    --added-bright: #a9c400;
+    --removed-bright: #ef6b68;
+    --test: #6c71c4;
+    --edge: #3f6b73;
+    --row-empty: rgba(88, 110, 117, 0.18);
+    --wash: 38, 139, 210;
+
+    /* One step per level of nesting */
+    --module: #04303c;
+    --file: #053742;
+    --group: #073d49;
+    --function: #08414e;
+
+    /* Syntax */
+    --syn-plain: #93a1a1;
+    --syn-comment: #587d81;
+    --syn-comment-style: italic;
+    --syn-keyword: #859900;
+    --syn-type: #b58900;
+    --syn-title: #268bd2;
+    --syn-string: #2aa198;
+    --syn-number: #d33682;
+}
+
+/*
+ * The same palette the other way up: base3 through base01, on paper.
+ * Its accents are a step darker than canon - at 3:1 on this background the
+ * originals are a strain, and the code is the point.
+ */
+[data-theme='solarized-light'] {
+    color-scheme: light;
+
+    /* Surfaces. Code gets its own, and it is the flattest of them: the
+       source is what the canvas is for, so nothing is tinted behind it. */
+    --bg: #fdf6e3;
+    --panel: #f6efdc;
+    --border: #ded8c3;
+    --input-bg: #fffbf0;
+    --code-bg: #fdf6e3;
+    --overlay: rgba(253, 246, 227, 0.96);
+    --tooltip-bg: #073642;
+    --container-bg: rgba(88, 110, 117, 0.06);
+    --inside-bg: rgba(88, 110, 117, 0.05);
+    --shadow: rgba(88, 110, 117, 0.25);
+
+    /* Type */
+    --text: #586e75;
+    --muted: #8a9a99;
+    --line-number: #a7b3b0;
+    --on-accent: #fdf6e3;
+    --hidden-opacity: 0.5;
+    --glow: none;
+
+    /* What the colours mean */
+    --accent-rgb: 38, 139, 210;
+    --added-rgb: 110, 128, 0;
+    --changed-rgb: 150, 113, 0;
+    --removed-rgb: 220, 50, 47;
+    --accent-bright: #1f6f9f;
+    --added-bright: #556600;
+    --removed-bright: #b52b28;
+    --test: #6c71c4;
+    --edge: #b3ad98;
+    --row-empty: rgba(88, 110, 117, 0.08);
+    --wash: 38, 139, 210;
+
+    /* One step per level of nesting */
+    --module: #efe8d4;
+    --file: #f2ebd8;
+    --group: #f5eedb;
+    --function: #fdf6e3;
+
+    /* Syntax */
+    --syn-plain: #586e75;
+    --syn-comment: #6b8083;
+    --syn-comment-style: italic;
+    --syn-keyword: #6b7c00;
+    --syn-type: #8f6d00;
+    --syn-title: #1f6fa8;
+    --syn-string: #1c7f78;
+    --syn-number: #b32468;
+}
+
+/*
+ * Retro groove: warm greys, and the loudest diff colours of any theme here.
+ */
+[data-theme='gruvbox'] {
+    color-scheme: dark;
+
+    /* Surfaces. Code gets its own, and it is the flattest of them: the
+       source is what the canvas is for, so nothing is tinted behind it. */
+    --bg: #1d2021;
+    --panel: #282828;
+    --border: #504945;
+    --input-bg: #1d2021;
+    --code-bg: #282828;
+    --overlay: rgba(29, 32, 33, 0.94);
+    --tooltip-bg: #32302f;
+    --container-bg: rgba(80, 73, 69, 0.35);
+    --inside-bg: rgba(235, 219, 178, 0.04);
+    --shadow: rgba(0, 0, 0, 0.6);
+
+    /* Type */
+    --text: #ebdbb2;
+    --muted: #a89984;
+    --line-number: #7c6f64;
+    --on-accent: #1d2021;
+    --hidden-opacity: 0.32;
+    --glow: none;
+
+    /* What the colours mean */
+    --accent-rgb: 131, 165, 152;
+    --added-rgb: 184, 187, 38;
+    --changed-rgb: 250, 189, 47;
+    --removed-rgb: 251, 73, 52;
+    --accent-bright: #a7c9bc;
+    --added-bright: #d3d64f;
+    --removed-bright: #ff8072;
+    --test: #d3869b;
+    --edge: #665c54;
+    --row-empty: rgba(168, 153, 132, 0.14);
+    --wash: 131, 165, 152;
+
+    /* One step per level of nesting */
+    --module: #232627;
+    --file: #282828;
+    --group: #2d2b2a;
+    --function: #32302f;
+
+    /* Syntax */
+    --syn-plain: #ebdbb2;
+    --syn-comment: #928374;
+    --syn-comment-style: italic;
+    --syn-keyword: #fb4934;
+    --syn-type: #fabd2f;
+    --syn-title: #8ec07c;
+    --syn-string: #b8bb26;
+    --syn-number: #d3869b;
+}
+
+/*
+ * Arctic blues: a cool, low-contrast palette that keeps its diff colours muted.
+ */
+[data-theme='nord'] {
+    color-scheme: dark;
+
+    /* Surfaces. Code gets its own, and it is the flattest of them: the
+       source is what the canvas is for, so nothing is tinted behind it. */
+    --bg: #272b35;
+    --panel: #2e3440;
+    --border: #4c566a;
+    --input-bg: #272b35;
+    --code-bg: #2e3440;
+    --overlay: rgba(39, 43, 53, 0.94);
+    --tooltip-bg: #3b4252;
+    --container-bg: rgba(59, 66, 82, 0.55);
+    --inside-bg: rgba(216, 222, 233, 0.04);
+    --shadow: rgba(0, 0, 0, 0.55);
+
+    /* Type */
+    --text: #eceff4;
+    --muted: #a6b0c2;
+    --line-number: #6b7691;
+    --on-accent: #2e3440;
+    --hidden-opacity: 0.32;
+    --glow: none;
+
+    /* What the colours mean */
+    --accent-rgb: 136, 192, 208;
+    --added-rgb: 163, 190, 140;
+    --changed-rgb: 235, 203, 139;
+    --removed-rgb: 191, 97, 106;
+    --accent-bright: #a7d6e2;
+    --added-bright: #c2d6a8;
+    --removed-bright: #d98c94;
+    --test: #b48ead;
+    --edge: #5b667c;
+    --row-empty: rgba(76, 86, 106, 0.35);
+    --wash: 136, 192, 208;
+
+    /* One step per level of nesting */
+    --module: #2a2f3a;
+    --file: #2e3440;
+    --group: #333a48;
+    --function: #374050;
+
+    /* Syntax */
+    --syn-plain: #eceff4;
+    --syn-comment: #7f8da6;
+    --syn-comment-style: italic;
+    --syn-keyword: #81a1c1;
+    --syn-type: #8fbcbb;
+    --syn-title: #88c0d0;
+    --syn-string: #a3be8c;
+    --syn-number: #b48ead;
+}
+
+/*
+ * Neon on a dark violet: the loudest syntax, and a purple for the chrome.
+ */
+[data-theme='dracula'] {
+    color-scheme: dark;
+
+    /* Surfaces. Code gets its own, and it is the flattest of them: the
+       source is what the canvas is for, so nothing is tinted behind it. */
+    --bg: #21222c;
+    --panel: #282a36;
+    --border: #44475a;
+    --input-bg: #21222c;
+    --code-bg: #282a36;
+    --overlay: rgba(33, 34, 44, 0.94);
+    --tooltip-bg: #343746;
+    --container-bg: rgba(68, 71, 90, 0.5);
+    --inside-bg: rgba(248, 248, 242, 0.04);
+    --shadow: rgba(0, 0, 0, 0.6);
+
+    /* Type */
+    --text: #f8f8f2;
+    --muted: #8b93c0;
+    --line-number: #6272a4;
+    --on-accent: #21222c;
+    --hidden-opacity: 0.32;
+    --glow: none;
+
+    /* What the colours mean */
+    --accent-rgb: 189, 147, 249;
+    --added-rgb: 80, 250, 123;
+    --changed-rgb: 241, 250, 140;
+    --removed-rgb: 255, 85, 85;
+    --accent-bright: #d6b8ff;
+    --added-bright: #8dffab;
+    --removed-bright: #ff8f8f;
+    --test: #ff79c6;
+    --edge: #5b6291;
+    --row-empty: rgba(98, 114, 164, 0.22);
+    --wash: 189, 147, 249;
+
+    /* One step per level of nesting */
+    --module: #242530;
+    --file: #282a36;
+    --group: #2d2f3d;
+    --function: #313343;
+
+    /* Syntax */
+    --syn-plain: #f8f8f2;
+    --syn-comment: #7787c0;
+    --syn-comment-style: italic;
+    --syn-keyword: #ff79c6;
+    --syn-type: #8be9fd;
+    --syn-title: #50fa7b;
+    --syn-string: #f1fa8c;
+    --syn-number: #bd93f9;
+}
+
+/* ---------- what tokens cannot say ---------- */
+
+/*
+ * Amber is a screen, not a page: scanlines and a vignette over everything, in
+ * the way of nothing. Only one theme has ever needed an escape hatch.
+ */
+[data-theme='amber'] body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    pointer-events: none;
+    background:
+        repeating-linear-gradient(rgba(0, 0, 0, 0.16) 0 1px, transparent 1px 3px),
+        radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, 0.45) 100%);
+}
+
+/* On a light page the tooltip is the only dark surface, so its text turns over. */
+[data-theme='paper'] #tooltip,
+[data-theme='solarized-light'] #tooltip {
+    color: #f7f5ef;
+}

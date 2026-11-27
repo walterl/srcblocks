@@ -1,0 +1,62 @@
+name: CI
+
+on:
+    push:
+        branches: [master]
+    pull_request:
+
+permissions:
+    contents: read
+
+jobs:
+    test:
+        name: Test (Node ${{ matrix.node-version }})
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                node-version: [22, 24, 26]
+        steps:
+            - uses: actions/checkout@v7
+            - uses: actions/setup-node@v7
+              with:
+                  node-version: ${{ matrix.node-version }}
+                  cache: npm
+            - run: npm ci
+            - run: npm test
+            # Formatting does not depend on the Node version; check it once.
+            - if: matrix.node-version == 24
+              run: npm run format:check
+
+    browser:
+        name: Browser smoke test
+        runs-on: ubuntu-latest
+        steps:
+            # Full history, so the server finds a default branch to draw.
+            - uses: actions/checkout@v7
+              with:
+                  fetch-depth: 0
+            - uses: actions/setup-node@v7
+              with:
+                  node-version: 24
+                  cache: npm
+            - run: npm ci
+            # The ubuntu runner image ships Google Chrome at this path.
+            - name: Serve this repository and drive the UI
+              shell: bash
+              env:
+                  SRCBLOCKS_REPO: ${{ github.workspace }}
+                  SRCBLOCKS_CACHE_DIR: ${{ runner.temp }}/srcblocks-cache
+                  CHROME_PATH: /usr/bin/google-chrome
+              run: |
+                  "$CHROME_PATH" --version
+                  node src/app/server.js > "$RUNNER_TEMP/server.log" 2>&1 &
+                  server=$!
+                  trap 'kill $server 2>/dev/null; cat "$RUNNER_TEMP/server.log"' EXIT
+                  for _ in $(seq 60); do
+                      curl -sf http://127.0.0.1:4173/api/repo > /dev/null && break
+                      sleep 1
+                  done
+                  node tools/themes.js
+                  node tools/smoke.js "" "$RUNNER_TEMP/smoke.png" | tee "$RUNNER_TEMP/smoke.log"
+                  grep -qx 'LOGS: clean' "$RUNNER_TEMP/smoke.log"
