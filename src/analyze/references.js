@@ -1,4 +1,5 @@
-import ts from 'typescript';
+import { SymbolFlags } from 'typescript/unstable/sync';
+import * as ast from 'typescript/unstable/ast';
 import { fileId, relativePath } from '#srcblocks/analyze/collect.js';
 
 /*
@@ -71,16 +72,24 @@ function groupAnchorsByFile(sourceAnchors) {
 
 function referencesIn(anchor, checker, locate) {
     const sourceFile = anchor.getSourceFile();
-    const origin = sourceFile.getLineAndCharacterOfPosition(anchor.getStart(sourceFile));
+    const start = anchor.getStart(sourceFile);
+    const end = anchor.getEnd();
+    const origin = sourceFile.getLineAndCharacterOfPosition(start);
     const refs = [];
 
     const visit = node => {
-        if (ts.isIdentifier(node)) {
+        if (ast.isIdentifier(node)) {
+            const position = node.getStart(sourceFile);
+            // The native compiler includes types from leading JSDoc in the
+            // tree. Their positions belong to the comment, outside this code.
+            if (position < start || node.getEnd() > end) {
+                return;
+            }
             const declaration = definitionOf(node, checker);
             // A name where it is declared is the definition, not a way to it.
             const target = declaration && declaration.name !== node ? locate(declaration) : null;
             if (target) {
-                const at = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));
+                const at = sourceFile.getLineAndCharacterOfPosition(position);
                 const line = at.line - origin.line;
                 // The code starts where the anchor does, so its first line is
                 // measured from the anchor's column rather than the file's.
@@ -88,7 +97,7 @@ function referencesIn(anchor, checker, locate) {
                 refs.push([line, column, node.text.length, ...target]);
             }
         }
-        ts.forEachChild(node, visit);
+        node.forEachChild(visit);
     };
     visit(anchor);
     return refs;
@@ -100,15 +109,15 @@ function referencesIn(anchor, checker, locate) {
  * built from rather than the property it creates.
  */
 function definitionOf(identifier, checker) {
-    let symbol = ts.isShorthandPropertyAssignment(identifier.parent)
+    let symbol = ast.isShorthandPropertyAssignment(identifier.parent)
         ? checker.getShorthandAssignmentValueSymbol(identifier.parent)
         : checker.getSymbolAtLocation(identifier);
-    if (symbol && symbol.flags & ts.SymbolFlags.Alias) {
+    if (symbol && symbol.flags & SymbolFlags.Alias) {
         try {
             symbol = checker.getAliasedSymbol(symbol);
         } catch {
             return null;
         }
     }
-    return symbol?.declarations?.[0] || null;
+    return symbol?.declarations[0]?.resolve();
 }

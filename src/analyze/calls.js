@@ -1,4 +1,5 @@
-import ts from 'typescript';
+import { SymbolFlags } from 'typescript/unstable/sync';
+import * as ast from 'typescript/unstable/ast';
 import {
     HTTP_CLIENTS,
     hostNode,
@@ -109,10 +110,10 @@ function addEdge(edges, sitesByEdge, source, target, call) {
 
 function visitCalls(node, onCall) {
     const visit = current => {
-        if (ts.isCallExpression(current) || ts.isNewExpression(current)) {
+        if (ast.isCallExpression(current) || ast.isNewExpression(current)) {
             onCall(current);
         }
-        ts.forEachChild(current, visit);
+        current.forEachChild(visit);
     };
     visit(node);
 }
@@ -137,11 +138,11 @@ function targetDeclarations(call, checker) {
 
     const signature = checker.getResolvedSignature(call);
     if (signature?.declaration) {
-        candidates.push(signature.declaration);
+        candidates.push(signature.declaration.resolve());
     }
 
     let symbol = checker.getSymbolAtLocation(call.expression);
-    if (symbol && symbol.flags & ts.SymbolFlags.Alias) {
+    if (symbol && symbol.flags & SymbolFlags.Alias) {
         try {
             symbol = checker.getAliasedSymbol(symbol);
         } catch {
@@ -149,7 +150,7 @@ function targetDeclarations(call, checker) {
         }
     }
     for (const declaration of symbol?.declarations || []) {
-        candidates.push(declaration);
+        candidates.push(declaration.resolve());
     }
 
     return candidates;
@@ -171,7 +172,7 @@ function graphIdForDeclaration(declaration, idByDeclaration) {
         return { id: direct, exact: true };
     }
 
-    if (ts.isVariableDeclaration(declaration) && declaration.initializer) {
+    if (ast.isVariableDeclaration(declaration) && declaration.initializer) {
         const viaInitializer = idByDeclaration.get(declaration.initializer);
         if (viaInitializer) {
             return { id: viaInitializer, exact: true };
@@ -182,12 +183,12 @@ function graphIdForDeclaration(declaration, idByDeclaration) {
     // function, or `new Foo()` landing on a class without a constructor) may
     // borrow their enclosing node's identity. Walking out of a local binding
     // would otherwise attribute the call to the function that contains it.
-    if (!ts.isFunctionLike(declaration) && !ts.isClassLike(declaration)) {
+    if (!ast.isFunctionLikeDeclaration(declaration) && !ast.isClassLikeDeclaration(declaration)) {
         return null;
     }
 
     let current = declaration.parent;
-    while (current && !ts.isSourceFile(current)) {
+    while (current && !ast.isSourceFile(current)) {
         const id = idByDeclaration.get(current);
         if (id) {
             return { id, exact: false };
@@ -251,9 +252,9 @@ function literalHostOf(call) {
     }
 
     let text = null;
-    if (ts.isStringLiteralLike(first)) {
+    if (ast.isStringLiteralLikeNode(first)) {
         text = first.text;
-    } else if (ts.isTemplateExpression(first)) {
+    } else if (ast.isTemplateExpression(first)) {
         // `https://api.example.com/orders/${id}` - the host is in the head.
         text = first.head.text;
     }
@@ -276,18 +277,18 @@ function literalHostOf(call) {
 function rootIdentifier(expression) {
     let current = expression;
     while (current) {
-        if (ts.isIdentifier(current)) {
+        if (ast.isIdentifier(current)) {
             return current;
         }
         if (
-            ts.isPropertyAccessExpression(current) ||
-            ts.isElementAccessExpression(current) ||
-            ts.isCallExpression(current) ||
-            ts.isNewExpression(current) ||
-            ts.isParenthesizedExpression(current) ||
-            ts.isNonNullExpression(current) ||
-            ts.isAwaitExpression(current) ||
-            ts.isAsExpression(current)
+            ast.isPropertyAccessExpression(current) ||
+            ast.isElementAccessExpression(current) ||
+            ast.isCallExpression(current) ||
+            ast.isNewExpression(current) ||
+            ast.isParenthesizedExpression(current) ||
+            ast.isNonNullExpression(current) ||
+            ast.isAwaitExpression(current) ||
+            ast.isAsExpression(current)
         ) {
             current = current.expression;
             continue;
@@ -304,32 +305,35 @@ function rootIdentifier(expression) {
  */
 function fieldProducer(expression) {
     let current = expression;
-    while (current && !ts.isPropertyAccessExpression(current)) {
-        if (ts.isCallExpression(current) || ts.isElementAccessExpression(current) || ts.isAwaitExpression(current)) {
+    while (current && !ast.isPropertyAccessExpression(current)) {
+        if (ast.isCallExpression(current) || ast.isElementAccessExpression(current) || ast.isAwaitExpression(current)) {
             current = current.expression;
             continue;
         }
         return null;
     }
     // Down to the innermost access, which is where `this` would be.
-    while (current && ts.isPropertyAccessExpression(current.expression)) {
+    while (current && ast.isPropertyAccessExpression(current.expression)) {
         current = current.expression;
     }
-    if (!current || current.expression.kind !== ts.SyntaxKind.ThisKeyword) {
+    if (!current || current.expression.kind !== ast.SyntaxKind.ThisKeyword) {
         return null;
     }
 
-    const classNode = ts.findAncestor(current, ts.isClassLike);
+    let classNode = current.parent;
+    while (classNode && !ast.isClassLikeDeclaration(classNode)) {
+        classNode = classNode.parent;
+    }
     if (!classNode) {
         return null;
     }
     const field = current.name.text;
 
     for (const member of classNode.members) {
-        if (ts.isPropertyDeclaration(member) && member.name.getText() === field && member.initializer) {
+        if (ast.isPropertyDeclaration(member) && member.name.getText() === field && member.initializer) {
             return rootIdentifier(member.initializer);
         }
-        if (ts.isConstructorDeclaration(member) && member.body) {
+        if (ast.isConstructorDeclaration(member) && member.body) {
             const assigned = fieldAssignment(member.body, field);
             if (assigned) {
                 return rootIdentifier(assigned);
@@ -347,16 +351,16 @@ function fieldAssignment(body, field) {
             return;
         }
         if (
-            ts.isBinaryExpression(node) &&
-            node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
-            ts.isPropertyAccessExpression(node.left) &&
-            node.left.expression.kind === ts.SyntaxKind.ThisKeyword &&
+            ast.isBinaryExpression(node) &&
+            node.operatorToken.kind === ast.SyntaxKind.EqualsToken &&
+            ast.isPropertyAccessExpression(node.left) &&
+            node.left.expression.kind === ast.SyntaxKind.ThisKeyword &&
             node.left.name.text === field
         ) {
             found = node.right;
             return;
         }
-        ts.forEachChild(node, visit);
+        node.forEachChild(visit);
     };
     visit(body);
     return found;
@@ -387,7 +391,7 @@ function packageOfIdentifier(identifier, checker, program, hops) {
     // import from inside the program: `import { pool } from './db.js'` names
     // no package, but what `pool` was made from might - a query through a
     // connection another file opened is still a query.
-    const specifier = specifierOf(symbol.declarations);
+    const specifier = specifierOf(declarationsOf(symbol));
     if (specifier) {
         if (!isInternalSpecifier(specifier)) {
             const named = packageNameOf(specifier);
@@ -405,14 +409,15 @@ function packageOfSymbol(symbol, checker, program, hops) {
         return null;
     }
 
-    for (const decl of symbol.declarations || []) {
+    const declarations = declarationsOf(symbol);
+    for (const decl of declarations) {
         const fromPath = packageFromPath(decl.getSourceFile().fileName);
         if (fromPath) {
             return isTypesOnly(fromPath) ? null : fromPath;
         }
     }
 
-    for (const decl of symbol.declarations || []) {
+    for (const decl of declarations) {
         const producer = producingIdentifier(decl);
         if (producer) {
             return packageOfIdentifier(producer, checker, program, hops + 1);
@@ -422,7 +427,7 @@ function packageOfSymbol(symbol, checker, program, hops) {
 }
 
 function aliasedSymbol(symbol, checker) {
-    if (!(symbol.flags & ts.SymbolFlags.Alias)) {
+    if (!(symbol.flags & SymbolFlags.Alias)) {
         return symbol;
     }
     try {
@@ -435,24 +440,24 @@ function aliasedSymbol(symbol, checker) {
 /* The module specifier a declaration imports from, if it is an import at all. */
 function specifierOf(declarations) {
     for (const decl of declarations || []) {
-        if (ts.isImportSpecifier(decl) || ts.isImportClause(decl) || ts.isNamespaceImport(decl)) {
-            const importDecl = ts.isImportSpecifier(decl) ? decl.parent.parent.parent : decl.parent;
+        if (ast.isImportSpecifier(decl) || ast.isImportClause(decl) || ast.isNamespaceImport(decl)) {
+            const importDecl = ast.isImportSpecifier(decl) ? decl.parent.parent.parent : decl.parent;
             const moduleSpecifier = importDecl?.moduleSpecifier;
-            if (moduleSpecifier && ts.isStringLiteralLike(moduleSpecifier)) {
+            if (moduleSpecifier && ast.isStringLiteralLikeNode(moduleSpecifier)) {
                 return moduleSpecifier.text;
             }
         }
-        if (ts.isImportEqualsDeclaration(decl) && ts.isExternalModuleReference(decl.moduleReference)) {
+        if (ast.isImportEqualsDeclaration(decl) && ast.isExternalModuleReference(decl.moduleReference)) {
             const reference = decl.moduleReference.expression;
-            if (ts.isStringLiteralLike(reference)) {
+            if (ast.isStringLiteralLikeNode(reference)) {
                 return reference.text;
             }
         }
         // CommonJS: `const pg = require('pg')`, `require('pg').Pool`, and
         // `const { Pool } = require('pg')`, whose binding element hangs off the
         // same variable declaration.
-        const variable = ts.isBindingElement(decl) ? enclosingVariable(decl) : decl;
-        if (variable && ts.isVariableDeclaration(variable) && variable.initializer) {
+        const variable = ast.isBindingElement(decl) ? enclosingVariable(decl) : decl;
+        if (variable && ast.isVariableDeclaration(variable) && variable.initializer) {
             const required = requiredSpecifier(variable.initializer);
             if (required) {
                 return required;
@@ -464,19 +469,19 @@ function specifierOf(declarations) {
 
 function enclosingVariable(node) {
     let current = node.parent;
-    while (current && !ts.isVariableDeclaration(current)) {
+    while (current && !ast.isVariableDeclaration(current)) {
         current = current.parent;
     }
     return current || null;
 }
 
 function requiredSpecifier(expression) {
-    const call = ts.isPropertyAccessExpression(expression) ? expression.expression : expression;
-    if (!ts.isCallExpression(call) || !ts.isIdentifier(call.expression) || call.expression.text !== 'require') {
+    const call = ast.isPropertyAccessExpression(expression) ? expression.expression : expression;
+    if (!ast.isCallExpression(call) || !ast.isIdentifier(call.expression) || call.expression.text !== 'require') {
         return null;
     }
     const [first] = call.arguments;
-    return first && ts.isStringLiteralLike(first) ? first.text : null;
+    return first && ast.isStringLiteralLikeNode(first) ? first.text : null;
 }
 
 /*
@@ -486,10 +491,10 @@ function requiredSpecifier(expression) {
  * function that only reads the rows a query returned has not queried anything.
  */
 function producingIdentifier(decl) {
-    if (!ts.isVariableDeclaration(decl) || !decl.initializer) {
+    if (!ast.isVariableDeclaration(decl) || !decl.initializer) {
         return null;
     }
-    if (ts.isAwaitExpression(decl.initializer)) {
+    if (ast.isAwaitExpression(decl.initializer)) {
         return null;
     }
     const root = rootIdentifier(decl.initializer);
@@ -497,5 +502,6 @@ function producingIdentifier(decl) {
 }
 
 const isLibSymbol = (symbol, program) =>
-    Boolean(program) &&
-    (symbol.declarations || []).some(decl => program.isSourceFileDefaultLibrary(decl.getSourceFile()));
+    Boolean(program) && declarationsOf(symbol).some(decl => program.isSourceFileDefaultLibrary(decl.getSourceFile()));
+
+const declarationsOf = symbol => symbol.declarations.map(handle => handle.resolve()).filter(Boolean);

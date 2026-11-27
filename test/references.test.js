@@ -51,4 +51,11 @@ describe('references', () => {
         expect(names).not.toContain('min');
         expect(names.filter(name => name === 'limit')).toHaveLength(1);
     });
+
+    it('only positions references inside the displayed source, excluding leading JSDoc', () => {
+        const graph = buildCallGraph({ rootDir: path.join(fixtures, 'flows-js') });
+        const refs = referencesOf(graph, 'func:src/api.js#handle');
+        expect(refs).toContainEqual(['place', 'func:src/service.js#place']);
+        expect(refs.map(([name]) => name)).not.toContain('Order');
+    });
 });

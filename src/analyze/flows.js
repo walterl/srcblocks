@@ -1,4 +1,5 @@
-import ts from 'typescript';
+import { SymbolFlags, TypeFlags } from 'typescript/unstable/sync';
+import * as ast from 'typescript/unstable/ast';
 import { packageNameOf } from '#srcblocks/analyze/externals.js';
 
 /*
@@ -21,17 +22,17 @@ const MAX_ANONYMOUS_MEMBERS = 40;
 const MAX_NODE_MEMBERS = 60;
 
 const PRIMITIVE_FLAGS =
-    ts.TypeFlags.StringLike |
-    ts.TypeFlags.NumberLike |
-    ts.TypeFlags.BooleanLike |
-    ts.TypeFlags.BigIntLike |
-    ts.TypeFlags.ESSymbolLike |
-    ts.TypeFlags.Void |
-    ts.TypeFlags.Undefined |
-    ts.TypeFlags.Null |
-    ts.TypeFlags.Never;
+    TypeFlags.StringLike |
+    TypeFlags.NumberLike |
+    TypeFlags.BooleanLike |
+    TypeFlags.BigIntLike |
+    TypeFlags.ESSymbolLike |
+    TypeFlags.Void |
+    TypeFlags.Undefined |
+    TypeFlags.Null |
+    TypeFlags.Never;
 
-const UNTYPED_FLAGS = ts.TypeFlags.Any | ts.TypeFlags.Unknown;
+const UNTYPED_FLAGS = TypeFlags.Any | TypeFlags.Unknown;
 
 const ANONYMOUS_SYMBOL_NAMES = new Set(['__type', '__object']);
 
@@ -85,11 +86,11 @@ export function dedupeRefs(refs) {
 const allUntyped = refs => refs.length > 0 && refs.every(ref => ref.untyped);
 
 function unwrapPromise(type, checker) {
-    const name = type.aliasSymbol?.name || type.symbol?.name;
-    if (name !== 'Promise') {
+    if (!type.isTypeReference() || (type.getAliasSymbol() || type.getSymbol())?.name !== 'Promise') {
         return type;
     }
-    return checker.getAwaitedType?.(type) || type;
+    const [value] = checker.getTypeArguments(type);
+    return value && value !== type ? unwrapPromise(value, checker) : type;
 }
 
 /*
@@ -99,15 +100,16 @@ function unwrapPromise(type, checker) {
  * (`Order | null`) is not a second kind of thing either.
  */
 function unionConstituents(type) {
-    if (!(type.flags & ts.TypeFlags.Union)) {
+    if (!(type.flags & TypeFlags.Union)) {
         return null;
     }
-    if (type.flags & (ts.TypeFlags.Boolean | ts.TypeFlags.EnumLike)) {
+    if (type.flags & (TypeFlags.Boolean | TypeFlags.EnumLike)) {
         return null;
     }
 
-    const present = type.types.filter(part => !(part.flags & (ts.TypeFlags.Null | ts.TypeFlags.Undefined)));
-    return present.length ? present : type.types.slice(0, 1);
+    const parts = type.getTypes();
+    const present = parts.filter(part => !(part.flags & (TypeFlags.Null | TypeFlags.Undefined)));
+    return present.length ? present : parts.slice(0, 1);
 }
 
 function referenceTo(type, checker, options) {
@@ -120,7 +122,7 @@ function referenceTo(type, checker, options) {
         return { ref: null, text, external: 'lib', primitive: true };
     }
 
-    if (isArray(type, checker)) {
+    if (checker.isArrayType(type)) {
         const [element] = checker.getTypeArguments(type) || [];
         // The element decides identity, the array decides how it reads. Many of
         // a thing is not one of that thing, so `string[]` is not a primitive.
@@ -146,7 +148,8 @@ function referenceTo(type, checker, options) {
  * first - `Status` is what the reader wrote.
  */
 function declarationRef(type, typeIdByDeclaration) {
-    const candidates = [...(type.aliasSymbol?.declarations || []), ...(type.symbol?.declarations || [])];
+    const handles = [...(type.getAliasSymbol()?.declarations || []), ...(type.getSymbol()?.declarations || [])];
+    const candidates = handles.map(handle => handle.resolve()).filter(Boolean);
     for (const decl of candidates) {
         const id = typeIdByDeclaration?.get(decl);
         if (id) {
@@ -162,7 +165,7 @@ function declarationRef(type, typeIdByDeclaration) {
  * is reported as `lib` so that it is never mistaken for a type of this program.
  */
 function externalityOf(type, decl, program) {
-    if (type.flags & ts.TypeFlags.TypeParameter) {
+    if (type.flags & TypeFlags.TypeParameter) {
         return 'lib';
     }
     if (!decl) {
@@ -189,13 +192,15 @@ export function packageFromPath(fileName) {
     return rest ? packageNameOf(rest) : null;
 }
 
-const isPrimitive = type => Boolean(type.flags & PRIMITIVE_FLAGS) && !(type.flags & ts.TypeFlags.EnumLike);
+const isPrimitive = type => Boolean(type.flags & PRIMITIVE_FLAGS) && !(type.flags & TypeFlags.EnumLike);
 
-const isArray = (type, checker) =>
-    typeof checker.isArrayType === 'function' ? checker.isArrayType(type) : type.symbol?.name === 'Array';
-
-const isAnonymousObject = type =>
-    Boolean(type.flags & ts.TypeFlags.Object) && (!type.symbol || ANONYMOUS_SYMBOL_NAMES.has(type.symbol.name));
+function isAnonymousObject(type) {
+    if (!(type.flags & TypeFlags.Object)) {
+        return false;
+    }
+    const symbol = type.getSymbol();
+    return !symbol || ANONYMOUS_SYMBOL_NAMES.has(symbol.name);
+}
 
 function safeText(type, checker) {
     try {
@@ -213,15 +218,16 @@ function membersOfType(type, checker, cap, anchor) {
         return [];
     }
     return properties.slice(0, cap).map(property => ({
-        name: property.getName(),
+        name: property.name,
         type: memberTypeText(property, checker, anchor),
     }));
 }
 
 function memberTypeText(property, checker, anchor) {
-    const node = property.valueDeclaration || property.declarations?.[0] || anchor;
+    const node = (property.valueDeclaration || property.declarations[0])?.resolve() || anchor;
     try {
-        return checker.typeToString(checker.getTypeOfSymbolAtLocation(property, node));
+        const type = node ? checker.getTypeOfSymbolAtLocation(property, node) : checker.getTypeOfSymbol(property);
+        return safeText(type, checker);
     } catch {
         return 'unknown';
     }
@@ -260,7 +266,7 @@ export function attachCarries(edges, sitesByEdge, checker, options = {}) {
 /* `new Foo()` returns the instance it constructs, which the signature knows. */
 function returnTypeOf(call, checker) {
     const signature = checker.getResolvedSignature(call);
-    return signature ? signature.getReturnType() : checker.getTypeAtLocation(call);
+    return (signature && checker.getReturnTypeOfSignature(signature)) || checker.getTypeAtLocation(call);
 }
 
 function carriesFrom(incoming, outgoing) {
@@ -308,7 +314,7 @@ const isTypeLike = node =>
 function declarationsById(typeIdByDeclaration) {
     const byId = new Map();
     for (const [decl, id] of typeIdByDeclaration || []) {
-        if (ts.isIdentifier(decl)) {
+        if (ast.isIdentifier(decl)) {
             continue;
         }
         if (!byId.has(id)) {
@@ -324,7 +330,7 @@ function declaredMembers(decl, checker) {
         const declared = checker.getDeclaredTypeOfSymbol(symbol);
         // Only a type that is a shape has members. `type Status = 'open' |
         // 'paid'` would otherwise report everything a string can do.
-        if (declared.flags & ts.TypeFlags.Object) {
+        if (declared.flags & TypeFlags.Object) {
             // A class's declared type is its instance side, which is the shape
             // a caller holding one sees.
             const members = membersOfType(declared, checker, MAX_NODE_MEMBERS, decl);
@@ -336,7 +342,7 @@ function declaredMembers(decl, checker) {
 
     // An enum's declared type is the union of its members, which has no
     // properties of its own; the declaration says what the cases are called.
-    if (ts.isEnumDeclaration(decl)) {
+    if (ast.isEnumDeclaration(decl)) {
         return decl.members.slice(0, MAX_NODE_MEMBERS).map(member => ({
             name: member.name.getText(),
             type: member.initializer ? member.initializer.getText() : 'number',
@@ -432,10 +438,10 @@ function accessEdge({ id, source, target, callCount, line, modes, reads, writes 
 
 function visitIdentifiers(node, onIdentifier) {
     const visit = current => {
-        if (ts.isIdentifier(current) && isReference(current)) {
+        if (ast.isIdentifier(current) && isReference(current)) {
             onIdentifier(current);
         }
-        ts.forEachChild(current, visit);
+        current.forEachChild(visit);
     };
     visit(node);
 }
@@ -454,19 +460,19 @@ function isReference(identifier) {
     if (parent.name === identifier || parent.propertyName === identifier) {
         return false;
     }
-    if (ts.isQualifiedName(parent) && parent.right === identifier) {
+    if (ast.isQualifiedName(parent) && parent.right === identifier) {
         return false;
     }
     if (
-        ts.isImportSpecifier(parent) ||
-        ts.isExportSpecifier(parent) ||
-        ts.isImportClause(parent) ||
-        ts.isNamespaceImport(parent) ||
-        ts.isImportEqualsDeclaration(parent)
+        ast.isImportSpecifier(parent) ||
+        ast.isExportSpecifier(parent) ||
+        ast.isImportClause(parent) ||
+        ast.isNamespaceImport(parent) ||
+        ast.isImportEqualsDeclaration(parent)
     ) {
         return false;
     }
-    if ((ts.isCallExpression(parent) || ts.isNewExpression(parent)) && parent.expression === identifier) {
+    if ((ast.isCallExpression(parent) || ast.isNewExpression(parent)) && parent.expression === identifier) {
         return false;
     }
     return true;
@@ -478,7 +484,7 @@ function dataTargetOf(identifier, checker, dataByDeclaration) {
     }
 
     let symbol = checker.getSymbolAtLocation(identifier);
-    if (symbol && symbol.flags & ts.SymbolFlags.Alias) {
+    if (symbol && symbol.flags & SymbolFlags.Alias) {
         try {
             symbol = checker.getAliasedSymbol(symbol);
         } catch {
@@ -486,8 +492,8 @@ function dataTargetOf(identifier, checker, dataByDeclaration) {
         }
     }
 
-    for (const decl of symbol?.declarations || []) {
-        const id = dataByDeclaration.get(decl);
+    for (const handle of symbol?.declarations || []) {
+        const id = dataByDeclaration.get(handle.resolve());
         if (id) {
             return id;
         }
@@ -505,7 +511,7 @@ function isWritePosition(identifier) {
     let parent = current.parent;
     while (
         parent &&
-        (ts.isPropertyAccessExpression(parent) || ts.isElementAccessExpression(parent)) &&
+        (ast.isPropertyAccessExpression(parent) || ast.isElementAccessExpression(parent)) &&
         parent.expression === current
     ) {
         current = parent;
@@ -515,12 +521,12 @@ function isWritePosition(identifier) {
         return false;
     }
 
-    if (ts.isBinaryExpression(parent) && parent.left === current) {
+    if (ast.isBinaryExpression(parent) && parent.left === current) {
         const kind = parent.operatorToken.kind;
-        return kind >= ts.SyntaxKind.FirstAssignment && kind <= ts.SyntaxKind.LastAssignment;
+        return kind >= ast.SyntaxKind.FirstAssignment && kind <= ast.SyntaxKind.LastAssignment;
     }
-    if ((ts.isPrefixUnaryExpression(parent) || ts.isPostfixUnaryExpression(parent)) && parent.operand === current) {
-        return parent.operator === ts.SyntaxKind.PlusPlusToken || parent.operator === ts.SyntaxKind.MinusMinusToken;
+    if ((ast.isPrefixUnaryExpression(parent) || ast.isPostfixUnaryExpression(parent)) && parent.operand === current) {
+        return parent.operator === ast.SyntaxKind.PlusPlusToken || parent.operator === ast.SyntaxKind.MinusMinusToken;
     }
     return false;
 }

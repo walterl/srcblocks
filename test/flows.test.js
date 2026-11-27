@@ -62,11 +62,12 @@ describe('carried types', () => {
 });
 
 describe('carried types in JavaScript', () => {
-    it('reads a JSDoc typedef as a type even where it declares no node', () => {
+    it('resolves a JSDoc typedef to the node that declares it', () => {
+        const order = 'data:src/types.js#Order';
         const carries = carriesOf(js, 'call:func:src/api.js#handle->func:src/service.js#place');
         expect(carries.untyped).toBe(false);
-        expect(carries.in[0]).toMatchObject({ ref: null, text: 'Order' });
-        expect(carries.in[0].members).toEqual([
+        expect(carries.in).toEqual([{ ref: order, text: 'Order', external: false }]);
+        expect(nodeById(js, order).members).toEqual([
             { name: 'id', type: 'string' },
             { name: 'total', type: 'number' },
         ]);

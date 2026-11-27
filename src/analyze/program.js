@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import ts from 'typescript';
+import { API } from 'typescript/unstable/sync';
 
 const SOURCE_EXTENSIONS = ['.js', '.jsx', '.mjs', '.cjs', '.ts', '.tsx', '.mts', '.cts'];
 const SKIP_DIRECTORIES = new Set(['node_modules', '.git', 'dist', 'build', 'out', 'coverage', '.next', '.cache']);
@@ -38,33 +38,52 @@ export function findSourceFiles(rootDir) {
 }
 
 /*
- * Creates a TypeScript program over every source file in `rootDir`. The program
- * powers both declaration collection and (type checker backed) call resolution,
- * for JavaScript as well as TypeScript sources.
+ * Runs analysis in a TypeScript 7 snapshot over the JavaScript and TypeScript
+ * files in `rootDir`. The snapshot owns the AST and checker for the duration of
+ * the analysis.
  */
-export function createProgram(rootDir) {
+export function withProgram(rootDir, analyze) {
+    rootDir = path.resolve(rootDir);
     const fileNames = findSourceFiles(rootDir);
-    const options = {
+    if (!fileNames.length) {
+        return analyze({ sourceFiles: [] });
+    }
+
+    const compilerOptions = {
         allowJs: true,
         checkJs: false,
+        strict: false,
         noEmit: true,
         skipLibCheck: true,
         skipDefaultLibCheck: true,
-        allowNonTsExtensions: true,
-        target: ts.ScriptTarget.ESNext,
-        module: ts.ModuleKind.NodeNext,
-        moduleResolution: ts.ModuleResolutionKind.NodeNext,
+        target: 'esnext',
+        module: 'nodenext',
+        moduleResolution: 'nodenext',
         resolveJsonModule: false,
         types: [],
-        lib: ['lib.esnext.d.ts'],
+        lib: ['esnext'],
     };
-    const host = ts.createCompilerHost(options, true);
-    host.getCurrentDirectory = () => rootDir;
-
-    const program = ts.createProgram({ rootNames: fileNames, options, host });
-    const sourceFiles = fileNames
-        .map(name => program.getSourceFile(name))
-        .filter(file => file && !program.isSourceFileDefaultLibrary(file));
-
-    return { program, checker: program.getTypeChecker(), sourceFiles };
+    // Open a virtual project so the analyzer controls which files are included
+    // even when a checkout has its own tsconfig or is read-only.
+    const configPath = path.join(rootDir, 'tsconfig.srcblocks.json');
+    const config = JSON.stringify({ compilerOptions, files: fileNames });
+    const api = new API({
+        cwd: rootDir,
+        fs: {
+            fileExists: file => (path.normalize(file) === configPath ? true : undefined),
+            readFile: file => (path.normalize(file) === configPath ? config : undefined),
+        },
+    });
+    try {
+        const snapshot = api.updateSnapshot({ openProjects: [configPath] });
+        try {
+            const { program, checker } = snapshot.getProject(configPath);
+            const sourceFiles = fileNames.map(file => program.getSourceFile(file)).filter(Boolean);
+            return analyze({ program, checker, sourceFiles });
+        } finally {
+            snapshot.dispose();
+        }
+    } finally {
+        api.close();
+    }
 }
